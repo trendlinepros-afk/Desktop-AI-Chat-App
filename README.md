@@ -1,4 +1,4 @@
-# 🔮 Polyglot
+# 🔮 WICKED
 
 **One window. Every model. One memory.**
 
@@ -9,7 +9,7 @@ A cross-platform desktop chat app and persistent AI memory system. Talk to **Ope
 ## Features
 
 - **Three providers, one UI** — OpenAI, Gemini, DeepSeek with per-chat model selection and streaming.
-- **Master Brain** — an Obsidian-compatible `PolyglotBrain/` vault of markdown notes. Relevant notes are auto-injected as context before each send (keyword + optional semantic search). End a chat and the model summarizes it into a categorized note.
+- **Master Brain** — an Obsidian-compatible `WickedBrain/` vault of markdown notes. Relevant notes are auto-injected as context before each send (keyword + optional semantic search). End a chat and the model summarizes it into a categorized note.
 - **💡 Ideas capture** — future-project ideas are detected and saved to a dedicated `Ideas/` section.
 - **Sidebar organization** — uncategorized chats up top, user folders below, rename/move/delete, export.
 - **Chat linking** — pull other conversations' history in as context.
@@ -39,9 +39,9 @@ First launch: open **Settings ⚙️**, add your API keys, and pick a **vault fo
 
 ## MCP servers — connecting DeepSeek to your Godot editor
 
-Polyglot can act as an **MCP client**. Any MCP server you add in **Settings → MCP Servers** has its
+WICKED can act as an **MCP client**. Any MCP server you add in **Settings → MCP Servers** has its
 tools exposed to OpenAI and DeepSeek through function-calling. When the model decides to use a tool,
-Polyglot runs it via the MCP server and feeds the result back — so the model can read and edit your
+WICKED runs it via the MCP server and feeds the result back — so the model can read and edit your
 Godot project while you chat.
 
 To wire up a Godot editor server:
@@ -51,7 +51,7 @@ To wire up a Godot editor server:
    - **Name**: `Godot`
    - **Command**: the launcher, e.g. `npx` (or an absolute path to the binary)
    - **Args**: e.g. `-y godot-mcp` (whatever the server's docs specify)
-3. Click **Test** to confirm Polyglot can connect and list its tools.
+3. Click **Test** to confirm WICKED can connect and list its tools.
 4. Select **DeepSeek** in the model bar and start chatting — the model will call the Godot tools as needed.
 
 > Tool-calling currently runs through the OpenAI and DeepSeek providers (OpenAI-compatible

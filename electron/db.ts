@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 export function initDb(): void {
-  const dbPath = path.join(app.getPath('userData'), 'polyglot.db');
+  const dbPath = path.join(app.getPath('userData'), 'wicked.db');
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');

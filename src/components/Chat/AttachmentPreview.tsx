@@ -14,7 +14,7 @@ export function AttachmentPreview({
       {attachments.map((att, i) => (
         <div
           key={i}
-          className="group relative flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-2 py-1.5 text-xs"
+          className="group relative flex items-center gap-2 rounded-lg border border-edge bg-surface px-2 py-1.5 text-xs"
         >
           {att.type === 'image_url' && att.image_url ? (
             <img

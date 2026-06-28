@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Chat, MemoryReview } from '../../types';
 import { VAULT_CATEGORIES } from '../../types';
 import { useChatStore } from '../../store/chatStore';
@@ -19,8 +19,12 @@ export function MemoryReviewModal({ chat, onClose }: { chat: Chat; onClose: () =
   const [tagInput, setTagInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [errored, setErrored] = useState<string | null>(null);
+  // Generate the summary exactly once when the modal opens — not on every
+  // streamed message update (which would fire extra paid summary calls).
+  const generatedRef = useRef(false);
 
   useEffect(() => {
+    if (generatedRef.current) return;
     if (!settings.vaultPath) {
       setErrored('Set a vault folder in Settings before saving to your Brain.');
       return;
@@ -30,6 +34,7 @@ export function MemoryReviewModal({ chat, onClose }: { chat: Chat; onClose: () =
       setErrored('Nothing to summarize yet.');
       return;
     }
+    generatedRef.current = true;
     generateReview(chat, messages, settings)
       .then(setReview)
       .catch((err) => setErrored((err as Error).message));
@@ -55,8 +60,8 @@ export function MemoryReviewModal({ chat, onClose }: { chat: Chat; onClose: () =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-topbar shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-edge bg-topbar shadow-2xl">
+        <div className="flex items-center justify-between border-b border-edge px-5 py-3">
           <h2 className="flex items-center gap-2 font-semibold text-brain">
             🧠 Add to Memory?
           </h2>
@@ -80,7 +85,7 @@ export function MemoryReviewModal({ chat, onClose }: { chat: Chat; onClose: () =
                   value={review.summary}
                   onChange={(e) => update({ summary: e.target.value })}
                   rows={3}
-                  className="w-full rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                  className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
                 />
               </Field>
 
@@ -91,7 +96,7 @@ export function MemoryReviewModal({ chat, onClose }: { chat: Chat; onClose: () =
                     update({ keyPoints: e.target.value.split('\n').filter(Boolean) })
                   }
                   rows={4}
-                  className="w-full rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                  className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
                 />
               </Field>
 
@@ -118,7 +123,7 @@ export function MemoryReviewModal({ chat, onClose }: { chat: Chat; onClose: () =
                 <select
                   value={review.category}
                   onChange={(e) => update({ category: e.target.value })}
-                  className="rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                  className="rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
                 >
                   {VAULT_CATEGORIES.map((c) => (
                     <option key={c} value={c}>
@@ -156,7 +161,7 @@ export function MemoryReviewModal({ chat, onClose }: { chat: Chat; onClose: () =
                       }
                     }}
                     placeholder="+ tag"
-                    className="w-20 rounded-full border border-white/10 bg-surface px-2 py-0.5 text-xs outline-none focus:border-accent"
+                    className="w-20 rounded-full border border-edge bg-surface px-2 py-0.5 text-xs outline-none focus:border-accent"
                   />
                 </div>
               </Field>
@@ -164,10 +169,10 @@ export function MemoryReviewModal({ chat, onClose }: { chat: Chat; onClose: () =
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-white/5 px-5 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-edge px-5 py-3">
           <button
             onClick={onClose}
-            className="rounded-lg border border-white/10 px-4 py-2 text-sm text-text-muted hover:text-text-primary"
+            className="rounded-lg border border-edge px-4 py-2 text-sm text-text-muted hover:text-text-primary"
           >
             ✗ Skip
           </button>

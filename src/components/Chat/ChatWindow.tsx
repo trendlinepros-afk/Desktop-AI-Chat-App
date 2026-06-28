@@ -7,6 +7,8 @@ import { InputArea } from './InputArea';
 import { LinkedChatsPanel } from '../LinkedChats/LinkedChatsPanel';
 import { VaultContextBadge } from '../Brain/VaultContextBadge';
 import { MemoryReviewModal } from '../Brain/MemoryReviewModal';
+import { ThemeToggle } from '../ThemeToggle';
+import { SuggestionBanner } from './SuggestionBanner';
 
 export function ChatWindow() {
   const activeChatId = useChatStore((s) => s.activeChatId);
@@ -19,18 +21,23 @@ export function ChatWindow() {
 
   if (!chat) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <div className="text-5xl">🔮</div>
-        <h2 className="mt-4 text-xl font-semibold">One window. Every model. One memory.</h2>
-        <p className="mt-2 max-w-sm text-sm text-text-muted">
-          Create a new chat to get started. Toggle the 🧠 Brain to let every model read from and
-          write to your Obsidian-compatible knowledge vault.
-        </p>
-        {!vaultPath && (
-          <p className="mt-3 text-xs text-brain">
-            Tip: set your vault folder in Settings ⚙️ to enable the Master Brain.
+      <div className="flex flex-1 flex-col">
+        <div className="flex items-center justify-end border-b border-edge bg-topbar px-4 py-2">
+          <ThemeToggle />
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <div className="text-5xl">🔮</div>
+          <h2 className="mt-4 text-xl font-semibold">One window. Every model. One memory.</h2>
+          <p className="mt-2 max-w-sm text-sm text-text-muted">
+            Create a new chat to get started. Toggle the 🧠 Brain to let every model read from and
+            write to your Obsidian-compatible knowledge vault.
           </p>
-        )}
+          {!vaultPath && (
+            <p className="mt-3 text-xs text-brain">
+              Tip: set your vault folder in Settings ⚙️ to enable the Master Brain.
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -40,14 +47,14 @@ export function ChatWindow() {
       <ModelSelector chat={chat} />
 
       {/* Chat sub-header: title, link, end & review */}
-      <div className="flex items-center gap-2 border-b border-white/5 bg-chat px-4 py-2">
+      <div className="flex items-center gap-2 border-b border-edge bg-chat px-4 py-2">
         <h2 className="flex-1 truncate text-sm font-medium">{chat.title}</h2>
         <VaultContextBadge chatId={chat.id} />
         <div className="relative">
           <button
             onClick={() => setLinkOpen((v) => !v)}
             title="Link other chats for cross-chat context"
-            className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-white/5 hover:text-text-primary"
+            className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
           >
             🔗 Link
           </button>
@@ -62,6 +69,7 @@ export function ChatWindow() {
         </button>
       </div>
 
+      <SuggestionBanner chat={chat} />
       <MessageList chat={chat} />
       <InputArea chat={chat} />
 

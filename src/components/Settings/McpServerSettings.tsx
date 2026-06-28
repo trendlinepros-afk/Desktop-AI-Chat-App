@@ -26,8 +26,14 @@ export function McpServerSettings() {
     await window.polyglot.mcpSaveServers(next);
   };
 
-  const update = (id: string, patch: Partial<McpServerConfig>) =>
+  const update = (id: string, patch: Partial<McpServerConfig>) => {
+    // Editing the command/args invalidates any live connection — drop it so the
+    // next Test / tool call re-spawns with the new config instead of the stale process.
+    if (patch.command !== undefined || patch.args !== undefined) {
+      void window.polyglot.mcpDisconnect(id);
+    }
     persist(servers.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  };
 
   const remove = async (id: string) => {
     await window.polyglot.mcpDisconnect(id);
@@ -53,13 +59,13 @@ export function McpServerSettings() {
       </p>
 
       {servers.map((server) => (
-        <div key={server.id} className="rounded-lg border border-white/10 bg-surface p-3">
+        <div key={server.id} className="rounded-lg border border-edge bg-surface p-3">
           <div className="mb-2 flex items-center gap-2">
             <input
               value={server.name}
               onChange={(e) => update(server.id, { name: e.target.value })}
               placeholder="Name (e.g. Godot)"
-              className="flex-1 rounded-md border border-white/10 bg-app px-2 py-1.5 text-sm outline-none focus:border-accent"
+              className="flex-1 rounded-md border border-edge bg-app px-2 py-1.5 text-sm outline-none focus:border-accent"
             />
             <label className="flex items-center gap-1 text-xs text-text-muted">
               <input
@@ -83,7 +89,7 @@ export function McpServerSettings() {
               value={server.command}
               onChange={(e) => update(server.id, { command: e.target.value })}
               placeholder="Command (e.g. npx)"
-              className="w-32 rounded-md border border-white/10 bg-app px-2 py-1.5 text-sm outline-none focus:border-accent"
+              className="w-32 rounded-md border border-edge bg-app px-2 py-1.5 text-sm outline-none focus:border-accent"
             />
             <input
               value={server.args.join(' ')}
@@ -91,12 +97,12 @@ export function McpServerSettings() {
                 update(server.id, { args: e.target.value.split(' ').filter(Boolean) })
               }
               placeholder="Args (e.g. -y godot-mcp)"
-              className="flex-1 rounded-md border border-white/10 bg-app px-2 py-1.5 text-sm outline-none focus:border-accent"
+              className="flex-1 rounded-md border border-edge bg-app px-2 py-1.5 text-sm outline-none focus:border-accent"
             />
             <button
               onClick={() => test(server)}
               disabled={testing === server.id || !server.command}
-              className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-text-muted hover:text-text-primary disabled:opacity-40"
+              className="rounded-md border border-edge px-3 py-1.5 text-xs text-text-muted hover:text-text-primary disabled:opacity-40"
             >
               {testing === server.id ? '…' : 'Test'}
             </button>
@@ -106,7 +112,7 @@ export function McpServerSettings() {
 
       <button
         onClick={() => persist([...servers, newServer()])}
-        className="rounded-lg border border-dashed border-white/15 px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+        className="rounded-lg border border-dashed border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
       >
         + Add MCP server
       </button>

@@ -48,7 +48,7 @@ export function ChatListItem({ chat }: { chat: Chat }) {
       <button
         onClick={() => selectChat(chat.id)}
         className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
-          active ? 'bg-accent/15 text-text-primary' : 'text-text-muted hover:bg-white/5'
+          active ? 'bg-accent/15 text-text-primary' : 'text-text-muted hover:bg-hover'
         }`}
       >
         <span
@@ -71,7 +71,7 @@ export function ChatListItem({ chat }: { chat: Chat }) {
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-white/10 bg-topbar py-1 text-sm shadow-xl">
+          <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-edge bg-topbar py-1 text-sm shadow-xl">
             <MenuItem
               label="Rename"
               onClick={() => {
@@ -98,7 +98,7 @@ export function ChatListItem({ chat }: { chat: Chat }) {
                 }}
               />
             ))}
-            <div className="my-1 border-t border-white/5" />
+            <div className="my-1 border-t border-edge" />
             <MenuItem
               label="Export as Markdown"
               onClick={async () => {
@@ -115,7 +115,7 @@ export function ChatListItem({ chat }: { chat: Chat }) {
                 if (path) toast(`Exported → ${path}`, 'success');
               }}
             />
-            <div className="my-1 border-t border-white/5" />
+            <div className="my-1 border-t border-edge" />
             <MenuItem
               label="Delete"
               danger
@@ -143,7 +143,7 @@ function MenuItem({
   return (
     <button
       onClick={onClick}
-      className={`block w-full px-3 py-1.5 text-left hover:bg-white/5 ${
+      className={`block w-full px-3 py-1.5 text-left hover:bg-hover ${
         danger ? 'text-red-400' : 'text-text-primary'
       }`}
     >

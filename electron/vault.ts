@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { VaultNote } from '../src/types';
 import { getVaultPath } from './db';
 
-const VAULT_SUBDIR = 'PolyglotBrain';
+const VAULT_SUBDIR = 'WickedBrain';
 const CATEGORIES = [
   'Ideas',
   'Projects',
@@ -100,10 +100,11 @@ export function readAll(): VaultNote[] {
 }
 
 export function readNote(relPath: string): string {
-  const root = vaultRoot();
-  const full = path.join(root, relPath);
-  // Prevent path traversal outside the vault.
-  if (!path.resolve(full).startsWith(path.resolve(root))) {
+  const root = path.resolve(vaultRoot());
+  const full = path.resolve(path.join(root, relPath));
+  // Prevent path traversal outside the vault. Compare against root + separator
+  // so a sibling like `<base>/WickedBrain-secret` can't satisfy the check.
+  if (full !== root && !full.startsWith(root + path.sep)) {
     throw new Error('Invalid note path');
   }
   return fs.readFileSync(full, 'utf-8');
@@ -186,7 +187,7 @@ export function regenerateIndex(): void {
     byCategory.set(note.category, list);
   }
 
-  let md = `---\ntitle: Polyglot Brain Index\ngenerated: ${new Date().toISOString().slice(0, 10)}\n---\n\n# 🧠 Polyglot Brain Index\n\nAuto-generated index of all notes in the vault.\n\n`;
+  let md = `---\ntitle: WICKED Brain Index\ngenerated: ${new Date().toISOString().slice(0, 10)}\n---\n\n# 🧠 WICKED Brain Index\n\nAuto-generated index of all notes in the vault.\n\n`;
 
   for (const cat of CATEGORIES) {
     const list = byCategory.get(cat);

@@ -74,13 +74,13 @@ export function InputArea({ chat }: { chat: Chat }) {
   };
 
   return (
-    <div className="border-t border-white/5 bg-chat px-4 py-3">
+    <div className="border-t border-edge bg-chat px-4 py-3">
       <div className="mx-auto max-w-3xl">
         <AttachmentPreview
           attachments={attachments}
           onRemove={(i) => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
         />
-        <div className="flex items-end gap-2 rounded-xl border border-white/10 bg-surface px-2 py-1.5 focus-within:border-accent/60">
+        <div className="flex items-end gap-2 rounded-xl border border-edge bg-surface px-2 py-1.5 focus-within:border-accent/60">
           <button
             onClick={onAttach}
             title="Attach a file"

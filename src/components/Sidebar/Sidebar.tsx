@@ -10,16 +10,16 @@ export function Sidebar() {
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
 
   return (
-    <aside className="flex h-full w-72 flex-shrink-0 flex-col border-r border-white/5 bg-sidebar">
+    <aside className="flex h-full w-72 flex-shrink-0 flex-col border-r border-edge bg-sidebar">
       <div className="flex items-center justify-between px-4 py-3.5">
         <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <span>🔮</span>
-          <span>Polyglot</span>
+          <span>WICKED</span>
         </h1>
         <button
           onClick={() => setSettingsOpen(true)}
           title="Settings"
-          className="rounded p-1.5 text-text-muted hover:bg-white/5 hover:text-text-primary"
+          className="rounded p-1.5 text-text-muted hover:bg-hover hover:text-text-primary"
         >
           ⚙️
         </button>
@@ -34,7 +34,7 @@ export function Sidebar() {
         <FolderList />
       </div>
 
-      <div className="border-t border-white/5 px-3 py-2.5">
+      <div className="border-t border-edge px-3 py-2.5">
         <NewFolderButton />
         <button
           onClick={toggleBrain}

@@ -37,7 +37,7 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 600,
     backgroundColor: '#0a0a0b',
-    title: 'Polyglot',
+    title: 'WICKED',
     webPreferences: {
       preload: resolvePreload(),
       contextIsolation: true,
@@ -143,7 +143,7 @@ function registerIpc(): void {
   ipcMain.handle('dialog:openVaultFolder', async () => {
     const result = await dialog.showOpenDialog(win!, {
       properties: ['openDirectory', 'createDirectory'],
-      title: 'Choose your Polyglot Brain vault location',
+      title: 'Choose your WICKED Brain vault location',
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
@@ -229,7 +229,7 @@ function registerIpc(): void {
     let target = p;
     const settings = db.getSettings();
     if (settings.vaultPath && !path.isAbsolute(p)) {
-      target = path.join(settings.vaultPath, 'PolyglotBrain', p);
+      target = path.join(settings.vaultPath, 'WickedBrain', p);
     }
     if (fs.existsSync(target)) return shell.openPath(target);
     return shell.openExternal(p);

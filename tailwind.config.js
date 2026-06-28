@@ -1,23 +1,30 @@
 /** @type {import('tailwindcss').Config} */
+function token(name) {
+  return `rgb(var(--c-${name}) / <alpha-value>)`;
+}
+
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        app: '#0a0a0b',
-        sidebar: '#0f0f10',
-        chat: '#111113',
-        topbar: '#18181b',
-        surface: '#1c1c1f',
-        user: '#1a2535',
-        accent: '#6366f1',
-        brain: '#f59e0b',
-        idea: '#10b981',
-        'text-primary': '#e4e4e7',
-        'text-muted': '#71717a',
-        openai: '#10a37f',
-        gemini: '#4285f4',
-        deepseek: '#7c3aed',
+        app: token('app'),
+        sidebar: token('sidebar'),
+        chat: token('chat'),
+        topbar: token('topbar'),
+        surface: token('surface'),
+        user: token('user'),
+        accent: token('accent'),
+        brain: token('brain'),
+        idea: token('idea'),
+        'text-primary': token('text-primary'),
+        'text-muted': token('text-muted'),
+        openai: token('openai'),
+        gemini: token('gemini'),
+        deepseek: token('deepseek'),
+        edge: token('edge'),
+        hover: token('hover'),
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', "'Segoe UI'", 'sans-serif'],

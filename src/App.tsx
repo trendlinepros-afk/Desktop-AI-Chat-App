@@ -10,6 +10,7 @@ import { useChatStore } from './store/chatStore';
 import { useFolderStore } from './store/folderStore';
 import { useBrainStore } from './store/brainStore';
 import { useUIStore } from './store/uiStore';
+import { useThemeStore } from './store/themeStore';
 
 export default function App() {
   const loadSettings = useSettingsStore((s) => s.load);
@@ -19,13 +20,15 @@ export default function App() {
   const toggleBrainPanel = useBrainStore((s) => s.togglePanel);
   const panelOpen = useBrainStore((s) => s.panelOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+  const initTheme = useThemeStore((s) => s.init);
 
   useEffect(() => {
+    initTheme();
     loadSettings();
     loadChats();
     loadFolders();
     loadNotes();
-  }, [loadSettings, loadChats, loadFolders, loadNotes]);
+  }, [initTheme, loadSettings, loadChats, loadFolders, loadNotes]);
 
   // Global keyboard shortcuts.
   useEffect(() => {

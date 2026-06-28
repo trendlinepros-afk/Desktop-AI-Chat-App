@@ -24,7 +24,7 @@ export function FolderItem({ folder }: { folder: Folder }) {
 
   return (
     <div>
-      <div className="group flex items-center gap-1 rounded-md px-2 py-1.5 hover:bg-white/5">
+      <div className="group flex items-center gap-1 rounded-md px-2 py-1.5 hover:bg-hover">
         {renaming ? (
           <input
             autoFocus
@@ -72,7 +72,7 @@ export function FolderItem({ folder }: { folder: Folder }) {
       </div>
 
       {expanded && (
-        <div className="ml-4 space-y-0.5 border-l border-white/5 pl-2">
+        <div className="ml-4 space-y-0.5 border-l border-edge pl-2">
           {folderChats.length === 0 ? (
             <div className="px-2 py-1 text-xs text-text-muted/60">Empty</div>
           ) : (

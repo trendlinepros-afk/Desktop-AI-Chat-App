@@ -2,6 +2,7 @@ import type { Chat, Provider } from '../../types';
 import { MODEL_CONFIG, PROVIDERS, defaultVersionFor } from './modelConfig';
 import { useChatStore } from '../../store/chatStore';
 import { useBrainStore } from '../../store/brainStore';
+import { ThemeToggle } from '../ThemeToggle';
 
 export function ModelSelector({ chat }: { chat: Chat }) {
   const setChatModel = useChatStore((s) => s.setChatModel);
@@ -22,7 +23,7 @@ export function ModelSelector({ chat }: { chat: Chat }) {
   const versions = imageGen && cfg.imageGenVersions ? cfg.imageGenVersions : cfg.versions;
 
   return (
-    <div className="flex items-center gap-2 border-b border-white/5 bg-topbar px-4 py-2 text-sm">
+    <div className="flex items-center gap-2 border-b border-edge bg-topbar px-4 py-2 text-sm">
       {/* Provider pill */}
       <div className="relative">
         <select
@@ -46,7 +47,7 @@ export function ModelSelector({ chat }: { chat: Chat }) {
       <select
         value={chat.modelVersion}
         onChange={(e) => setChatModel(chat.id, chat.provider, e.target.value)}
-        className="cursor-pointer rounded-lg border border-white/10 bg-surface px-3 py-1 outline-none focus:border-accent"
+        className="cursor-pointer rounded-lg border border-edge bg-surface px-3 py-1 outline-none focus:border-accent"
       >
         {versions.map((v) => (
           <option key={v.id} value={v.id}>
@@ -71,7 +72,7 @@ export function ModelSelector({ chat }: { chat: Chat }) {
           className={`rounded-lg px-3 py-1 transition ${
             imageGen
               ? 'bg-gemini text-white'
-              : 'border border-white/10 text-text-muted hover:text-text-primary'
+              : 'border border-edge text-text-muted hover:text-text-primary'
           }`}
         >
           🎨 Image Gen
@@ -86,11 +87,14 @@ export function ModelSelector({ chat }: { chat: Chat }) {
         className={`rounded-lg px-3 py-1 font-medium transition ${
           brainEnabled
             ? 'bg-brain/20 text-brain animate-brain-pulse ring-1 ring-brain/50'
-            : 'border border-white/10 text-text-muted hover:text-text-primary'
+            : 'border border-edge text-text-muted hover:text-text-primary'
         }`}
       >
         🧠 Brain {brainEnabled ? 'ON' : 'OFF'}
       </button>
+
+      {/* Light/dark theme toggle (top-right) */}
+      <ThemeToggle />
     </div>
   );
 }

@@ -50,7 +50,10 @@ function parseReviewJson(raw: string): MemoryReview {
 }
 
 function frontmatter(fields: Record<string, string>): string {
-  const lines = Object.entries(fields).map(([k, v]) => `${k}: ${v}`);
+  // Collapse newlines so a value can't break out of the YAML block.
+  const lines = Object.entries(fields).map(
+    ([k, v]) => `${k}: ${String(v).replace(/[\r\n]+/g, ' ').trim()}`
+  );
   return `---\n${lines.join('\n')}\n---\n`;
 }
 

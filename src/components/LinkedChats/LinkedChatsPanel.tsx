@@ -30,7 +30,7 @@ export function LinkedChatsPanel({ chat, onClose }: { chat: Chat; onClose: () =>
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
-      <div className="absolute right-0 z-40 mt-2 w-72 rounded-xl border border-white/10 bg-topbar p-2 shadow-2xl">
+      <div className="absolute right-0 z-40 mt-2 w-72 rounded-xl border border-edge bg-topbar p-2 shadow-2xl">
         <div className="px-1 pb-2 text-xs text-text-muted">
           Link chats to share their context with this conversation.
         </div>
@@ -38,7 +38,7 @@ export function LinkedChatsPanel({ chat, onClose }: { chat: Chat; onClose: () =>
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search chats…"
-          className="mb-2 w-full rounded-lg border border-white/10 bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
+          className="mb-2 w-full rounded-lg border border-edge bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
         />
         <div className="max-h-64 overflow-y-auto">
           {candidates.length === 0 ? (
@@ -47,7 +47,7 @@ export function LinkedChatsPanel({ chat, onClose }: { chat: Chat; onClose: () =>
             candidates.map((c) => (
               <label
                 key={c.id}
-                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-white/5"
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-hover"
               >
                 <input
                   type="checkbox"

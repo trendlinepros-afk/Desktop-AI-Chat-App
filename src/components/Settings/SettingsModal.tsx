@@ -35,8 +35,8 @@ export function SettingsModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-topbar shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
+      <div className="flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-edge bg-topbar shadow-2xl">
+        <div className="flex items-center justify-between border-b border-edge px-5 py-3">
           <h2 className="font-semibold">⚙️ Settings</h2>
           <button onClick={() => setOpen(false)} className="text-text-muted hover:text-text-primary">
             ✕
@@ -69,7 +69,7 @@ export function SettingsModal() {
               <input
                 readOnly
                 value={draft.vaultPath || 'No vault folder selected'}
-                className="flex-1 truncate rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm text-text-muted"
+                className="flex-1 truncate rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-text-muted"
               />
               <button
                 onClick={pickVault}
@@ -79,7 +79,7 @@ export function SettingsModal() {
               </button>
             </div>
             <p className="mt-1 text-xs text-text-muted">
-              A <code>PolyglotBrain/</code> folder of Obsidian-compatible markdown notes is created here.
+              A <code>WickedBrain/</code> folder of Obsidian-compatible markdown notes is created here.
             </p>
           </Section>
 
@@ -95,7 +95,7 @@ export function SettingsModal() {
                     defaultModelVersion: defaultVersionFor(provider),
                   });
                 }}
-                className="flex-1 rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
               >
                 {PROVIDERS.map((p) => (
                   <option key={p} value={p}>
@@ -106,7 +106,7 @@ export function SettingsModal() {
               <select
                 value={draft.defaultModelVersion}
                 onChange={(e) => update({ defaultModelVersion: e.target.value })}
-                className="flex-1 rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
               >
                 {MODEL_CONFIG[draft.defaultProvider].versions.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -139,10 +139,10 @@ export function SettingsModal() {
           </Section>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-white/5 px-5 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-edge px-5 py-3">
           <button
             onClick={() => setOpen(false)}
-            className="rounded-lg border border-white/10 px-4 py-2 text-sm text-text-muted hover:text-text-primary"
+            className="rounded-lg border border-edge px-4 py-2 text-sm text-text-muted hover:text-text-primary"
           >
             Cancel
           </button>
@@ -180,7 +180,7 @@ function KeyInput({
   return (
     <div className="flex items-center gap-2">
       <span className="w-20 text-sm text-text-muted">{label}</span>
-      <div className="flex flex-1 items-center rounded-lg border border-white/10 bg-surface focus-within:border-accent">
+      <div className="flex flex-1 items-center rounded-lg border border-edge bg-surface focus-within:border-accent">
         <input
           type={show ? 'text' : 'password'}
           value={value}

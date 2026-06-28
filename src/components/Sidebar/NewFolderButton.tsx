@@ -28,7 +28,7 @@ export function NewFolderButton() {
           }
         }}
         placeholder="Folder name…"
-        className="w-full rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+        className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
       />
     );
   }
@@ -36,7 +36,7 @@ export function NewFolderButton() {
   return (
     <button
       onClick={() => setEditing(true)}
-      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-muted hover:bg-white/5 hover:text-text-primary"
+      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
     >
       <span className="text-base leading-none">+</span> New Folder
     </button>

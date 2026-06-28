@@ -2,8 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* ===== Theme tokens (space-separated RGB channels for rgb(var() / <alpha>)) ===== */
+:root,
+:root.theme-dark {
   color-scheme: dark;
+  --c-app: 10 10 11;
+  --c-sidebar: 15 15 16;
+  --c-chat: 17 17 19;
+  --c-topbar: 24 24 27;
+  --c-surface: 28 28 31;
+  --c-user: 26 37 53;
+  --c-accent: 99 102 241;
+  --c-brain: 245 158 11;
+  --c-idea: 16 185 129;
+  --c-text-primary: 228 228 231;
+  --c-text-muted: 113 113 122;
+  --c-openai: 16 163 127;
+  --c-gemini: 66 133 244;
+  --c-deepseek: 124 58 237;
+  --c-edge: 39 39 42;
+  --c-hover: 39 39 42;
+  --c-code-bg: 0 0 0;
+  --c-code-alpha: 0.33;
+}
+
+:root.theme-light {
+  color-scheme: light;
+  --c-app: 247 247 248;
+  --c-sidebar: 241 241 243;
+  --c-chat: 255 255 255;
+  --c-topbar: 255 255 255;
+  --c-surface: 240 240 242;
+  --c-user: 219 231 245;
+  --c-accent: 99 102 241;
+  --c-brain: 180 83 9;
+  --c-idea: 4 120 87;
+  --c-text-primary: 24 24 27;
+  --c-text-muted: 82 82 91;
+  --c-openai: 16 163 127;
+  --c-gemini: 66 133 244;
+  --c-deepseek: 124 58 237;
+  --c-edge: 228 228 231;
+  --c-hover: 233 233 236;
+  --c-code-bg: 0 0 0;
+  --c-code-alpha: 0.06;
 }
 
 html,
@@ -15,8 +57,8 @@ body,
 }
 
 body {
-  background-color: #0a0a0b;
-  color: #e4e4e7;
+  background-color: rgb(var(--c-app));
+  color: rgb(var(--c-text-primary));
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -31,11 +73,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2a2e;
+  background: rgb(var(--c-edge));
   border-radius: 5px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3f;
+  background: rgb(var(--c-text-muted) / 0.6);
 }
 
 /* Markdown rendering inside message bubbles */
@@ -76,7 +118,7 @@ body {
   margin: 0.2em 0;
 }
 .markdown-body code {
-  background: #00000055;
+  background: rgb(var(--c-code-bg) / var(--c-code-alpha));
   padding: 0.1em 0.35em;
   border-radius: 4px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
@@ -92,14 +134,14 @@ body {
   padding: 0;
 }
 .markdown-body a {
-  color: #818cf8;
+  color: rgb(var(--c-accent));
   text-decoration: underline;
 }
 .markdown-body blockquote {
-  border-left: 3px solid #3f3f46;
+  border-left: 3px solid rgb(var(--c-edge));
   padding-left: 0.8em;
   margin: 0.5em 0;
-  color: #a1a1aa;
+  color: rgb(var(--c-text-muted));
 }
 .markdown-body table {
   border-collapse: collapse;
@@ -107,7 +149,7 @@ body {
 }
 .markdown-body th,
 .markdown-body td {
-  border: 1px solid #2a2a2e;
+  border: 1px solid rgb(var(--c-edge));
   padding: 0.3em 0.6em;
 }
 

@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PolyglotAPI } from '../src/types';
+import type { WickedAPI } from '../src/types';
 
-const api: PolyglotAPI = {
+const api: WickedAPI = {
   // Chats
   getChats: () => ipcRenderer.invoke('chats:getAll'),
   createChat: (data) => ipcRenderer.invoke('chats:create', data),

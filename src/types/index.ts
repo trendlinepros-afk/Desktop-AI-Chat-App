@@ -101,7 +101,7 @@ export const VAULT_CATEGORIES = [
 export type VaultCategory = (typeof VAULT_CATEGORIES)[number];
 
 // The API surface exposed on window.polyglot via the preload contextBridge.
-export interface PolyglotAPI {
+export interface WickedAPI {
   // Chats
   getChats(): Promise<Chat[]>;
   createChat(data: {
@@ -174,6 +174,6 @@ export interface PolyglotAPI {
 
 declare global {
   interface Window {
-    polyglot: PolyglotAPI;
+    polyglot: WickedAPI;
   }
 }

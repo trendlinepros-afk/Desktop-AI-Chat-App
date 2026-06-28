@@ -103,9 +103,13 @@ export function useSend() {
       const assistantMsg = makeMessage(chat.id, 'assistant', [{ type: 'text', text: '' }]);
       addMessage(assistantMsg);
 
+      // Only touch the visible message list while THIS chat is still active —
+      // otherwise an in-flight stream would write into a chat the user switched to.
+      const isActive = () => useChatStore.getState().activeChatId === chat.id;
+
       bufferRef.current = '';
       flushTimerRef.current = setInterval(() => {
-        updateLastAssistant([{ type: 'text', text: bufferRef.current }]);
+        if (isActive()) updateLastAssistant([{ type: 'text', text: bufferRef.current }]);
       }, 50);
 
       let finalText = '';
@@ -128,7 +132,7 @@ export function useSend() {
       }
 
       const finalContent: ContentPart[] = [{ type: 'text', text: finalText }];
-      updateLastAssistant(finalContent);
+      if (isActive()) updateLastAssistant(finalContent);
       await window.polyglot.saveMessage({
         chatId: chat.id,
         role: 'assistant',

@@ -134,6 +134,7 @@ async function runToolLoop(
 
   const messages = formatForOpenAI(opts.messages) as ChatCompletionMessageParam[];
   const MAX_ROUNDS = 6;
+  let lastText = '';
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (opts.signal?.aborted) break;
@@ -146,9 +147,13 @@ async function runToolLoop(
     const choice = res.choices[0]?.message;
     if (!choice) break;
 
+    // The model may emit prose alongside tool calls — keep the latest non-empty text.
+    if (choice.content) lastText = choice.content;
+
     if (choice.tool_calls && choice.tool_calls.length > 0) {
       messages.push(choice);
-      opts.onToken(`🛠️ Running ${choice.tool_calls.length} tool call(s)…`);
+      const note = `${lastText ? lastText + '\n\n' : ''}🛠️ Running ${choice.tool_calls.length} tool call(s)…`;
+      opts.onToken(note);
       for (const call of choice.tool_calls) {
         if (call.type !== 'function') continue;
         let result: string;
@@ -167,7 +172,8 @@ async function runToolLoop(
     opts.onToken(text);
     return text;
   }
-  return 'Tool loop ended without a final response.';
+  // Ran out of rounds (or aborted) — return whatever prose we last saw.
+  return lastText || 'Tool loop ended without a final response.';
 }
 
 async function streamGemini(apiKey: string, opts: SendOptions): Promise<string> {

@@ -1,6 +1,6 @@
 {
-  "appId": "com.polyglot.app",
-  "productName": "Polyglot",
+  "appId": "com.wicked.app",
+  "productName": "WICKED",
   "directories": {
     "output": "release",
     "buildResources": "build"

@@ -40,7 +40,7 @@ export function BrainPanel() {
   const openExternal = (path: string) => window.polyglot.openExternal(path);
 
   return (
-    <aside className="flex h-full w-[360px] flex-shrink-0 flex-col border-l border-white/5 bg-sidebar">
+    <aside className="flex h-full w-[360px] flex-shrink-0 flex-col border-l border-edge bg-sidebar">
       <div className="flex items-center justify-between px-4 py-3">
         <h2 className="flex items-center gap-2 font-semibold text-brain">🧠 Master Brain</h2>
         <button
@@ -51,7 +51,7 @@ export function BrainPanel() {
         </button>
       </div>
 
-      <div className="flex border-b border-white/5 px-2 text-sm">
+      <div className="flex border-b border-edge px-2 text-sm">
         <TabBtn active={tab === 'notes'} onClick={() => setTab('notes')} label="📚 Notes" />
         <TabBtn active={tab === 'ideas'} onClick={() => setTab('ideas')} label="💡 Ideas" />
         <TabBtn active={tab === 'search'} onClick={() => setTab('search')} label="🔍 Search" />
@@ -113,7 +113,7 @@ export function BrainPanel() {
                     search(e.target.value);
                   }}
                   placeholder="Search the vault…"
-                  className="mb-3 w-full rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                  className="mb-3 w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
                 />
                 <div className="space-y-1">
                   {query && searchResults.length === 0 && <Empty text="No matches." />}
@@ -169,7 +169,7 @@ function NoteRow({ note, onClick }: { note: VaultNote; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="block w-full truncate rounded-md px-2 py-1.5 text-left text-sm text-text-primary hover:bg-white/5"
+      className="block w-full truncate rounded-md px-2 py-1.5 text-left text-sm text-text-primary hover:bg-hover"
     >
       {note.title}
     </button>
@@ -193,7 +193,7 @@ function NotePreview({
         </button>
         <button
           onClick={() => onOpen(note.path)}
-          className="rounded-md border border-white/10 px-2 py-1 text-xs text-text-muted hover:text-text-primary"
+          className="rounded-md border border-edge px-2 py-1 text-xs text-text-muted hover:text-text-primary"
         >
           Edit in Obsidian
         </button>
@@ -201,7 +201,7 @@ function NotePreview({
       <h3 className="text-base font-semibold">{note.title}</h3>
       <div className="mb-2 flex flex-wrap gap-1">
         {note.tags.map((t) => (
-          <span key={t} className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-text-muted">
+          <span key={t} className="rounded-full bg-hover px-2 py-0.5 text-[10px] text-text-muted">
             #{t}
           </span>
         ))}
