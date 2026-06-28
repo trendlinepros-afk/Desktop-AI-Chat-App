@@ -5,6 +5,7 @@ import type { ChatCompletionMessageParam } from 'openai/resources/index';
 import type { Content } from '@google/generative-ai';
 import type { ContentPart, Message, Provider, Settings } from '../types';
 import { ollamaOpenAIBase } from '../lib/ollama';
+import { withRetry } from '../lib/retry';
 
 export interface SendOptions {
   provider: Provider;
@@ -105,11 +106,13 @@ async function streamOpenAICompatible(
     return runToolLoop(client, opts, mcpTools);
   }
 
-  const stream = await client.chat.completions.create({
-    model: opts.modelVersion,
-    messages: formatForOpenAI(opts.messages),
-    stream: true,
-  });
+  const stream = await withRetry(() =>
+    client.chat.completions.create({
+      model: opts.modelVersion,
+      messages: formatForOpenAI(opts.messages),
+      stream: true,
+    })
+  );
   let full = '';
   for await (const chunk of stream) {
     if (opts.signal?.aborted) break;
@@ -139,12 +142,14 @@ async function runToolLoop(
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (opts.signal?.aborted) break;
-    const res = await client.chat.completions.create({
-      model: opts.modelVersion,
-      messages,
-      tools,
-      tool_choice: 'auto',
-    });
+    const res = await withRetry(() =>
+      client.chat.completions.create({
+        model: opts.modelVersion,
+        messages,
+        tools,
+        tool_choice: 'auto',
+      })
+    );
     const choice = res.choices[0]?.message;
     if (!choice) break;
 
@@ -184,7 +189,7 @@ async function streamGemini(apiKey: string, opts: SendOptions): Promise<string> 
     model: opts.modelVersion,
     ...(system ? { systemInstruction: system } : {}),
   });
-  const result = await model.generateContentStream({ contents });
+  const result = await withRetry(() => model.generateContentStream({ contents }));
   let full = '';
   for await (const chunk of result.stream) {
     if (opts.signal?.aborted) break;
@@ -291,7 +296,7 @@ export async function completeText(
   if (provider === 'gemini') {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelVersion });
-    const result = await model.generateContent(prompt);
+    const result = await withRetry(() => model.generateContent(prompt));
     return result.response.text();
   }
   const baseURL =
@@ -301,9 +306,11 @@ export async function completeText(
         ? ollamaOpenAIBase(settings.ollamaBaseUrl)
         : undefined;
   const client = new OpenAI({ apiKey, baseURL, dangerouslyAllowBrowser: true });
-  const res = await client.chat.completions.create({
-    model: modelVersion,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  const res = await withRetry(() =>
+    client.chat.completions.create({
+      model: modelVersion,
+      messages: [{ role: 'user', content: prompt }],
+    })
+  );
   return res.choices[0]?.message?.content ?? '';
 }

@@ -11,6 +11,7 @@ import { ThemeToggle } from '../ThemeToggle';
 import { SuggestionBanner } from './SuggestionBanner';
 import { SystemPromptModal } from './SystemPromptModal';
 import { BuildPromptModal } from '../Plan/BuildPromptModal';
+import { UsageMeter } from './UsageMeter';
 
 export function ChatWindow() {
   const activeChatId = useChatStore((s) => s.activeChatId);
@@ -53,6 +54,7 @@ export function ChatWindow() {
       {/* Chat sub-header: title, link, end & review */}
       <div className="flex items-center gap-2 border-b border-edge bg-chat px-4 py-2">
         <h2 className="flex-1 truncate text-sm font-medium">{chat.title}</h2>
+        <UsageMeter chat={chat} />
         <VaultContextBadge chatId={chat.id} />
         <button
           onClick={() => setPersonaOpen(true)}
