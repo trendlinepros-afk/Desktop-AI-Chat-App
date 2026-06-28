@@ -16,6 +16,7 @@ const EMPTY: Settings = {
   defaultProvider: 'openai',
   defaultModelVersion: 'gpt-4o',
   semanticIndexingEnabled: true,
+  ollamaBaseUrl: 'http://localhost:11434',
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

@@ -1,4 +1,4 @@
-export type Provider = 'openai' | 'gemini' | 'deepseek';
+export type Provider = 'openai' | 'gemini' | 'deepseek' | 'ollama';
 
 export interface Folder {
   id: string;
@@ -86,6 +86,7 @@ export interface Settings {
   defaultProvider: Provider;
   defaultModelVersion: string;
   semanticIndexingEnabled: boolean;
+  ollamaBaseUrl: string; // e.g. http://localhost:11434
 }
 
 export const VAULT_CATEGORIES = [

@@ -4,6 +4,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
 import { MODEL_CONFIG, PROVIDERS, defaultVersionFor } from '../ModelSelector/modelConfig';
 import { McpServerSettings } from './McpServerSettings';
+import { listOllamaModels } from '../../lib/ollama';
 
 export function SettingsModal() {
   const open = useUIStore((s) => s.settingsOpen);
@@ -130,6 +131,40 @@ export function SettingsModal() {
             </label>
             <p className="mt-1 text-xs text-text-muted">
               When off, the Brain uses keyword search only — useful if you have no OpenAI key.
+            </p>
+          </Section>
+
+          {/* Ollama (local LLM) */}
+          <Section title="Ollama (local LLM)">
+            <div className="flex items-center gap-2">
+              <input
+                value={draft.ollamaBaseUrl}
+                onChange={(e) => update({ ollamaBaseUrl: e.target.value })}
+                placeholder="http://localhost:11434"
+                className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+              <button
+                onClick={async () => {
+                  const models = await listOllamaModels(draft.ollamaBaseUrl);
+                  if (models.length > 0)
+                    toast(`Ollama reachable — ${models.length} model(s) installed`, 'success');
+                  else toast('No Ollama server reachable at that URL', 'error');
+                }}
+                className="rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+              >
+                Test
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              Run models locally with no API key or usage cost. Install{' '}
+              <button
+                className="text-accent underline"
+                onClick={() => window.polyglot.openExternal('https://ollama.com')}
+              >
+                Ollama
+              </button>
+              , then pick <strong>Ollama (local)</strong> in the model bar — your installed models
+              load automatically.
             </p>
           </Section>
 

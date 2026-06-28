@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react';
 import type { Chat, Provider } from '../../types';
-import { MODEL_CONFIG, PROVIDERS, defaultVersionFor } from './modelConfig';
+import { MODEL_CONFIG, PROVIDERS, defaultVersionFor, type ModelVersion } from './modelConfig';
 import { useChatStore } from '../../store/chatStore';
 import { useBrainStore } from '../../store/brainStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { ThemeToggle } from '../ThemeToggle';
+import { listOllamaModels } from '../../lib/ollama';
 
 export function ModelSelector({ chat }: { chat: Chat }) {
   const setChatModel = useChatStore((s) => s.setChatModel);
@@ -11,8 +14,22 @@ export function ModelSelector({ chat }: { chat: Chat }) {
   const imageGen = useChatStore((s) => s.imageGenMode[chat.id] ?? false);
   const setImageGen = useChatStore((s) => s.setImageGen);
   const togglePanel = useBrainStore((s) => s.togglePanel);
+  const ollamaBaseUrl = useSettingsStore((s) => s.settings.ollamaBaseUrl);
+  const [ollamaModels, setOllamaModels] = useState<ModelVersion[]>([]);
 
   const cfg = MODEL_CONFIG[chat.provider];
+
+  // For Ollama, list the models actually installed on the local server.
+  useEffect(() => {
+    if (chat.provider !== 'ollama') return;
+    let cancelled = false;
+    listOllamaModels(ollamaBaseUrl).then((models) => {
+      if (!cancelled && models.length > 0) setOllamaModels(models);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chat.provider, ollamaBaseUrl]);
 
   const onProvider = (provider: Provider) => {
     const version = defaultVersionFor(provider);
@@ -20,7 +37,9 @@ export function ModelSelector({ chat }: { chat: Chat }) {
     if (provider !== 'gemini') setImageGen(chat.id, false);
   };
 
-  const versions = imageGen && cfg.imageGenVersions ? cfg.imageGenVersions : cfg.versions;
+  const baseVersions =
+    chat.provider === 'ollama' && ollamaModels.length > 0 ? ollamaModels : cfg.versions;
+  const versions = imageGen && cfg.imageGenVersions ? cfg.imageGenVersions : baseVersions;
 
   return (
     <div className="flex items-center gap-2 border-b border-edge bg-topbar px-4 py-2 text-sm">
@@ -49,7 +68,10 @@ export function ModelSelector({ chat }: { chat: Chat }) {
         onChange={(e) => setChatModel(chat.id, chat.provider, e.target.value)}
         className="cursor-pointer rounded-lg border border-edge bg-surface px-3 py-1 outline-none focus:border-accent"
       >
-        {versions.map((v) => (
+        {(versions.some((v) => v.id === chat.modelVersion)
+          ? versions
+          : [{ id: chat.modelVersion, label: chat.modelVersion }, ...versions]
+        ).map((v) => (
           <option key={v.id} value={v.id}>
             {v.label}
           </option>

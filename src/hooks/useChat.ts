@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { ChatCompletionMessageParam } from 'openai/resources/index';
 import type { Content } from '@google/generative-ai';
 import type { ContentPart, Message, Provider, Settings } from '../types';
+import { ollamaOpenAIBase } from '../lib/ollama';
 
 export interface SendOptions {
   provider: Provider;
@@ -220,6 +221,9 @@ function keyFor(provider: Provider, settings: Settings): string {
       return settings.geminiApiKey;
     case 'deepseek':
       return settings.deepseekApiKey;
+    case 'ollama':
+      // Local Ollama needs no key; the SDK still wants a non-empty string.
+      return 'ollama';
   }
 }
 
@@ -253,6 +257,12 @@ export function useChat() {
             'https://api.deepseek.com',
             withSignal
           );
+        case 'ollama':
+          return await streamOpenAICompatible(
+            apiKey,
+            ollamaOpenAIBase(opts.settings.ollamaBaseUrl),
+            withSignal
+          );
         case 'gemini':
           return await streamGemini(apiKey, withSignal);
       }
@@ -284,7 +294,12 @@ export async function completeText(
     const result = await model.generateContent(prompt);
     return result.response.text();
   }
-  const baseURL = provider === 'deepseek' ? 'https://api.deepseek.com' : undefined;
+  const baseURL =
+    provider === 'deepseek'
+      ? 'https://api.deepseek.com'
+      : provider === 'ollama'
+        ? ollamaOpenAIBase(settings.ollamaBaseUrl)
+        : undefined;
   const client = new OpenAI({ apiKey, baseURL, dangerouslyAllowBrowser: true });
   const res = await client.chat.completions.create({
     model: modelVersion,

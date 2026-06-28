@@ -44,9 +44,24 @@ export const MODEL_CONFIG: Record<Provider, ProviderConfig> = {
       { id: 'deepseek-reasoner', label: 'DeepSeek R1' },
     ],
   },
+  ollama: {
+    label: 'Ollama (local)',
+    color: '#475569',
+    // Defaults shown before we fetch the machine's actually-installed models.
+    versions: [
+      { id: 'llama3.2', label: 'Llama 3.2' },
+      { id: 'llama3.1', label: 'Llama 3.1' },
+      { id: 'qwen2.5', label: 'Qwen 2.5' },
+      { id: 'mistral', label: 'Mistral' },
+      { id: 'deepseek-r1', label: 'DeepSeek R1 (local)' },
+      { id: 'gemma2', label: 'Gemma 2' },
+      { id: 'phi3', label: 'Phi-3' },
+      { id: 'codellama', label: 'Code Llama' },
+    ],
+  },
 };
 
-export const PROVIDERS: Provider[] = ['openai', 'gemini', 'deepseek'];
+export const PROVIDERS: Provider[] = ['openai', 'gemini', 'deepseek', 'ollama'];
 
 export function providerColor(provider: Provider): string {
   return MODEL_CONFIG[provider].color;

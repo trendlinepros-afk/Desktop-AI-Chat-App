@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS: Settings = {
   defaultProvider: 'openai',
   defaultModelVersion: 'gpt-4o',
   semanticIndexingEnabled: true,
+  ollamaBaseUrl: 'http://localhost:11434',
 };
 
 export function initDb(): void {
@@ -279,6 +280,7 @@ export function getSettings(): Settings {
     semanticIndexingEnabled: map.has('semanticIndexingEnabled')
       ? map.get('semanticIndexingEnabled') === 'true'
       : DEFAULT_SETTINGS.semanticIndexingEnabled,
+    ollamaBaseUrl: map.get('ollamaBaseUrl') ?? DEFAULT_SETTINGS.ollamaBaseUrl,
   };
 }
 
