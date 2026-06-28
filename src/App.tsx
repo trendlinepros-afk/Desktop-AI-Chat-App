@@ -4,6 +4,7 @@ import { ChatWindow } from './components/Chat/ChatWindow';
 import { UpdateChecker } from './components/UpdateChecker';
 import { BrainPanel } from './components/Brain/BrainPanel';
 import { SettingsModal } from './components/Settings/SettingsModal';
+import { OnboardingModal } from './components/Onboarding/OnboardingModal';
 import { Toaster } from './components/Toaster';
 import { useSettingsStore } from './store/settingsStore';
 import { useChatStore } from './store/chatStore';
@@ -11,6 +12,7 @@ import { useFolderStore } from './store/folderStore';
 import { useBrainStore } from './store/brainStore';
 import { useUIStore } from './store/uiStore';
 import { useThemeStore } from './store/themeStore';
+import { useOnboardingStore } from './store/onboardingStore';
 
 export default function App() {
   const loadSettings = useSettingsStore((s) => s.load);
@@ -21,14 +23,16 @@ export default function App() {
   const panelOpen = useBrainStore((s) => s.panelOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const initTheme = useThemeStore((s) => s.init);
+  const initOnboarding = useOnboardingStore((s) => s.init);
 
   useEffect(() => {
     initTheme();
+    initOnboarding();
     loadSettings();
     loadChats();
     loadFolders();
     loadNotes();
-  }, [initTheme, loadSettings, loadChats, loadFolders, loadNotes]);
+  }, [initTheme, initOnboarding, loadSettings, loadChats, loadFolders, loadNotes]);
 
   // Global keyboard shortcuts.
   useEffect(() => {
@@ -54,6 +58,7 @@ export default function App() {
       </main>
       {panelOpen && <BrainPanel />}
       <SettingsModal />
+      <OnboardingModal />
       <Toaster />
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Provider, Settings } from '../../types';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
+import { useOnboardingStore } from '../../store/onboardingStore';
 import { MODEL_CONFIG, PROVIDERS, defaultVersionFor } from '../ModelSelector/modelConfig';
 import { McpServerSettings } from './McpServerSettings';
 import { OllamaModelManager } from './OllamaModelManager';
@@ -13,6 +14,7 @@ export function SettingsModal() {
   const toast = useUIStore((s) => s.toast);
   const settings = useSettingsStore((s) => s.settings);
   const save = useSettingsStore((s) => s.save);
+  const startOnboarding = useOnboardingStore((s) => s.start);
 
   const [draft, setDraft] = useState<Settings>(settings);
   const [managerOpen, setManagerOpen] = useState(false);
@@ -179,6 +181,19 @@ export function SettingsModal() {
           {/* MCP servers */}
           <Section title="MCP Servers (tool use)">
             <McpServerSettings />
+          </Section>
+
+          {/* Help */}
+          <Section title="Help">
+            <button
+              onClick={() => {
+                setOpen(false);
+                startOnboarding();
+              }}
+              className="rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+            >
+              ▶ Replay welcome tour
+            </button>
           </Section>
         </div>
 
