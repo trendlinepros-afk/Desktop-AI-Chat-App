@@ -8,3 +8,5 @@ release/
 .env.local
 *.local
 .vite/
+screenshots/
+diag.mjs
