@@ -11,7 +11,8 @@
     {
       "provider": "github",
       "owner": "trendlinepros-afk",
-      "repo": "desktop-ai-chat-app"
+      "repo": "desktop-ai-chat-app",
+      "releaseType": "release"
     }
   ],
   "mac": {
