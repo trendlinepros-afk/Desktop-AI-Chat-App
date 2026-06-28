@@ -65,6 +65,35 @@ const STEPS: Step[] = [
     ),
   },
   {
+    emoji: '🟣',
+    title: 'Use it with Obsidian (optional)',
+    body: (
+      <>
+        <p>
+          WICKED writes plain markdown, so the vault works on its own. But you can also open it in{' '}
+          <strong>Obsidian</strong> to browse, edit, and see links between notes:
+        </p>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>
+            Install <strong>Obsidian</strong> (obsidian.md) — it's free.
+          </li>
+          <li>
+            In Obsidian choose <strong>“Open folder as vault”</strong> and select the folder you
+            picked in WICKED (or the <code>WickedBrain</code> folder inside it).
+          </li>
+          <li>
+            Your notes, the <code>_index.md</code>, and the <code>Ideas/</code> &amp;{' '}
+            <code>Projects/</code> sections appear instantly — edits sync both ways since it's the
+            same files.
+          </li>
+        </ol>
+        <p className="mt-2 text-text-muted">
+          Tip: any note in WICKED's Brain panel has an <strong>“Edit in Obsidian”</strong> button.
+        </p>
+      </>
+    ),
+  },
+  {
     emoji: '🗺',
     title: 'Plan Mode',
     body: (
