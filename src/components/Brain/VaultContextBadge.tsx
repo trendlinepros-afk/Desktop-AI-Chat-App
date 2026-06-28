@@ -1,7 +1,12 @@
 import { useBrainStore } from '../../store/brainStore';
+import type { InjectedNote } from '../../store/brainStore';
+
+const EMPTY: InjectedNote[] = [];
 
 export function VaultContextBadge({ chatId }: { chatId: string }) {
-  const injected = useBrainStore((s) => s.activeContext[chatId] ?? []);
+  // Select the raw value (default to a STABLE empty array) — returning a fresh
+  // `[]` from the selector would change the snapshot every render and loop.
+  const injected = useBrainStore((s) => s.activeContext[chatId] ?? EMPTY);
   const openPanel = useBrainStore((s) => s.setPanelOpen);
 
   if (injected.length === 0) return null;
