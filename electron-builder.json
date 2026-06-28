@@ -1,0 +1,28 @@
+{
+  "appId": "com.polyglot.app",
+  "productName": "Polyglot",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": ["dist", "dist-electron"],
+  "asarUnpack": ["**/node_modules/better-sqlite3/**"],
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "trendlinepros-afk",
+      "repo": "desktop-ai-chat-app"
+    }
+  ],
+  "mac": {
+    "target": ["dmg"],
+    "category": "public.app-category.productivity"
+  },
+  "win": {
+    "target": ["nsis"]
+  },
+  "linux": {
+    "target": ["AppImage"],
+    "category": "Utility"
+  }
+}

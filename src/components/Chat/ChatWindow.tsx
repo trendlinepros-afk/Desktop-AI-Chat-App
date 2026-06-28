@@ -1,0 +1,71 @@
+import { useState } from 'react';
+import { useChatStore } from '../../store/chatStore';
+import { useSettingsStore } from '../../store/settingsStore';
+import { ModelSelector } from '../ModelSelector/ModelSelector';
+import { MessageList } from './MessageList';
+import { InputArea } from './InputArea';
+import { LinkedChatsPanel } from '../LinkedChats/LinkedChatsPanel';
+import { VaultContextBadge } from '../Brain/VaultContextBadge';
+import { MemoryReviewModal } from '../Brain/MemoryReviewModal';
+
+export function ChatWindow() {
+  const activeChatId = useChatStore((s) => s.activeChatId);
+  const chats = useChatStore((s) => s.chats);
+  const vaultPath = useSettingsStore((s) => s.settings.vaultPath);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  const chat = chats.find((c) => c.id === activeChatId) ?? null;
+
+  if (!chat) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
+        <div className="text-5xl">🔮</div>
+        <h2 className="mt-4 text-xl font-semibold">One window. Every model. One memory.</h2>
+        <p className="mt-2 max-w-sm text-sm text-text-muted">
+          Create a new chat to get started. Toggle the 🧠 Brain to let every model read from and
+          write to your Obsidian-compatible knowledge vault.
+        </p>
+        {!vaultPath && (
+          <p className="mt-3 text-xs text-brain">
+            Tip: set your vault folder in Settings ⚙️ to enable the Master Brain.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <ModelSelector chat={chat} />
+
+      {/* Chat sub-header: title, link, end & review */}
+      <div className="flex items-center gap-2 border-b border-white/5 bg-chat px-4 py-2">
+        <h2 className="flex-1 truncate text-sm font-medium">{chat.title}</h2>
+        <VaultContextBadge chatId={chat.id} />
+        <div className="relative">
+          <button
+            onClick={() => setLinkOpen((v) => !v)}
+            title="Link other chats for cross-chat context"
+            className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-white/5 hover:text-text-primary"
+          >
+            🔗 Link
+          </button>
+          {linkOpen && <LinkedChatsPanel chat={chat} onClose={() => setLinkOpen(false)} />}
+        </div>
+        <button
+          onClick={() => setReviewOpen(true)}
+          title="Summarize this chat and save to your Brain"
+          className="rounded-md border border-brain/30 px-2 py-1 text-sm text-brain hover:bg-brain/10"
+        >
+          ✓ End & Review
+        </button>
+      </div>
+
+      <MessageList chat={chat} />
+      <InputArea chat={chat} />
+
+      {reviewOpen && <MemoryReviewModal chat={chat} onClose={() => setReviewOpen(false)} />}
+    </div>
+  );
+}
