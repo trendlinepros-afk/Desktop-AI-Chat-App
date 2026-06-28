@@ -1,8 +1,33 @@
 import Database from 'better-sqlite3';
-import { app } from 'electron';
+import { app, safeStorage } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Chat, Folder, Message, Provider, Settings } from '../src/types';
+
+// API keys are stored encrypted at rest via the OS keychain (safeStorage).
+const SECRET_KEYS = new Set(['openaiApiKey', 'geminiApiKey', 'deepseekApiKey']);
+const ENC_PREFIX = 'enc:v1:';
+
+function encryptSecret(value: string): string {
+  if (!value) return value;
+  try {
+    if (safeStorage.isEncryptionAvailable()) {
+      return ENC_PREFIX + safeStorage.encryptString(value).toString('base64');
+    }
+  } catch {
+    /* fall through to plaintext */
+  }
+  return value;
+}
+
+function decryptSecret(value: string): string {
+  if (!value || !value.startsWith(ENC_PREFIX)) return value;
+  try {
+    return safeStorage.decryptString(Buffer.from(value.slice(ENC_PREFIX.length), 'base64'));
+  } catch {
+    return '';
+  }
+}
 
 let db: Database.Database;
 
@@ -468,9 +493,9 @@ export function getSettings(): Settings {
   }[];
   const map = new Map(rows.map((r) => [r.key, r.value]));
   return {
-    openaiApiKey: map.get('openaiApiKey') ?? DEFAULT_SETTINGS.openaiApiKey,
-    geminiApiKey: map.get('geminiApiKey') ?? DEFAULT_SETTINGS.geminiApiKey,
-    deepseekApiKey: map.get('deepseekApiKey') ?? DEFAULT_SETTINGS.deepseekApiKey,
+    openaiApiKey: decryptSecret(map.get('openaiApiKey') ?? DEFAULT_SETTINGS.openaiApiKey),
+    geminiApiKey: decryptSecret(map.get('geminiApiKey') ?? DEFAULT_SETTINGS.geminiApiKey),
+    deepseekApiKey: decryptSecret(map.get('deepseekApiKey') ?? DEFAULT_SETTINGS.deepseekApiKey),
     vaultPath: map.get('vaultPath') ?? DEFAULT_SETTINGS.vaultPath,
     defaultProvider: (map.get('defaultProvider') as Provider) ?? DEFAULT_SETTINGS.defaultProvider,
     defaultModelVersion: map.get('defaultModelVersion') ?? DEFAULT_SETTINGS.defaultModelVersion,
@@ -488,9 +513,10 @@ export function saveSettings(partial: Partial<Settings>): void {
   const tx = db.transaction((entries: [string, string][]) => {
     for (const [key, value] of entries) stmt.run(key, value);
   });
-  const entries = Object.entries(partial).map(
-    ([k, v]) => [k, String(v)] as [string, string]
-  );
+  const entries = Object.entries(partial).map(([k, v]) => {
+    const str = String(v);
+    return [k, SECRET_KEYS.has(k) ? encryptSecret(str) : str] as [string, string];
+  });
   tx(entries);
 }
 

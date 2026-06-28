@@ -186,6 +186,8 @@ export interface WickedAPI {
   vaultGetEmbeddings(): Promise<Record<string, number[]>>;
   vaultSaveEmbedding(path: string, embedding: number[]): Promise<void>;
   vaultRegenerateIndex(): Promise<void>;
+  vaultGitStatus(): Promise<{ isRepo: boolean; hasRemote: boolean; branch: string; dirtyCount: number }>;
+  vaultGitSync(message: string): Promise<string>;
 
   // Export
   exportMarkdown(filename: string, content: string): Promise<string | null>;

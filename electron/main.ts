@@ -180,6 +180,12 @@ function registerIpc(): void {
     vault.saveEmbedding(p, embedding)
   );
   ipcMain.handle('vault:regenerateIndex', () => safeVault(() => vault.regenerateIndex(), undefined));
+  ipcMain.handle('vault:gitStatus', () =>
+    safeVault(() => vault.gitStatus(), { isRepo: false, hasRemote: false, branch: '', dirtyCount: 0 })
+  );
+  ipcMain.handle('vault:gitSync', (_e, message: string) =>
+    safeVault(() => vault.gitSync(message), 'Vault not configured.')
+  );
 
   // ----- Export -----
   ipcMain.handle('export:markdown', async (_e, filename: string, content: string) => {

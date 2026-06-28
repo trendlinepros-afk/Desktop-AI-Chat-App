@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import type { VaultNote } from '../../types';
 import { useBrainStore } from '../../store/brainStore';
 import { useChatStore } from '../../store/chatStore';
+import { useUIStore } from '../../store/uiStore';
 
 type Tab = 'notes' | 'ideas' | 'search' | 'context';
 
@@ -43,12 +44,15 @@ export function BrainPanel() {
     <aside className="flex h-full w-[360px] flex-shrink-0 flex-col border-l border-edge bg-sidebar">
       <div className="flex items-center justify-between px-4 py-3">
         <h2 className="flex items-center gap-2 font-semibold text-brain">🧠 Master Brain</h2>
-        <button
-          onClick={() => setPanelOpen(false)}
-          className="text-text-muted hover:text-text-primary"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-1">
+          <GitSyncButton />
+          <button
+            onClick={() => setPanelOpen(false)}
+            className="text-text-muted hover:text-text-primary"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div className="flex border-b border-edge px-2 text-sm">
@@ -215,4 +219,29 @@ function NotePreview({
 
 function Empty({ text }: { text: string }) {
   return <div className="px-2 py-6 text-center text-xs text-text-muted">{text}</div>;
+}
+
+function GitSyncButton() {
+  const toast = useUIStore((s) => s.toast);
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const result = await window.polyglot.vaultGitSync('WICKED vault sync');
+          toast(result, 'success');
+        } catch (err) {
+          toast(`Git sync failed: ${(err as Error).message}`, 'error');
+        } finally {
+          setBusy(false);
+        }
+      }}
+      disabled={busy}
+      title="Commit & push the vault with git (versioning / sync)"
+      className="rounded-md border border-edge px-2 py-1 text-xs text-text-muted hover:text-text-primary disabled:opacity-50"
+    >
+      {busy ? '…' : '⇅ Sync'}
+    </button>
+  );
 }

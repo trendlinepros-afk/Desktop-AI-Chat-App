@@ -59,6 +59,8 @@ const api: WickedAPI = {
   vaultGetEmbeddings: () => ipcRenderer.invoke('vault:getEmbeddings'),
   vaultSaveEmbedding: (p, embedding) => ipcRenderer.invoke('vault:saveEmbedding', p, embedding),
   vaultRegenerateIndex: () => ipcRenderer.invoke('vault:regenerateIndex'),
+  vaultGitStatus: () => ipcRenderer.invoke('vault:gitStatus'),
+  vaultGitSync: (message) => ipcRenderer.invoke('vault:gitSync', message),
 
   // Export
   exportMarkdown: (filename, content) => ipcRenderer.invoke('export:markdown', filename, content),

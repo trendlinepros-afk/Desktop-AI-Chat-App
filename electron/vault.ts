@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import type { VaultNote } from '../src/types';
 import { getVaultPath } from './db';
 
@@ -175,6 +176,75 @@ export function saveEmbedding(relPath: string, embedding: number[]): void {
   const all = getEmbeddings();
   all[relPath] = embedding;
   fs.writeFileSync(embeddingsPath(), JSON.stringify(all), 'utf-8');
+}
+
+// ---------- Git sync ----------
+
+function git(args: string[]): string {
+  return execFileSync('git', args, { cwd: vaultRoot(), encoding: 'utf-8' }).trim();
+}
+
+export interface GitStatus {
+  isRepo: boolean;
+  hasRemote: boolean;
+  branch: string;
+  dirtyCount: number;
+}
+
+export function gitStatus(): GitStatus {
+  const root = vaultRoot();
+  const isRepo = fs.existsSync(path.join(root, '.git'));
+  if (!isRepo) return { isRepo: false, hasRemote: false, branch: '', dirtyCount: 0 };
+  let hasRemote = false;
+  let branch = '';
+  let dirtyCount = 0;
+  try {
+    hasRemote = git(['remote']).length > 0;
+    branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+    dirtyCount = git(['status', '--porcelain']).split('\n').filter(Boolean).length;
+  } catch {
+    /* ignore */
+  }
+  return { isRepo, hasRemote, branch, dirtyCount };
+}
+
+// Initialise the repo if needed, commit all changes, and push when a remote exists.
+export function gitSync(message: string): string {
+  const root = vaultRoot();
+  if (!fs.existsSync(path.join(root, '.git'))) {
+    git(['init']);
+    try {
+      git(['checkout', '-b', 'main']);
+    } catch {
+      /* already on a branch */
+    }
+  }
+  git(['add', '-A']);
+  const dirty = git(['status', '--porcelain']).length > 0;
+  if (dirty) {
+    try {
+      git(['commit', '-m', message || 'WICKED vault sync']);
+    } catch (err) {
+      return `Commit failed: ${(err as Error).message}`;
+    }
+  }
+  const hasRemote = (() => {
+    try {
+      return git(['remote']).length > 0;
+    } catch {
+      return false;
+    }
+  })();
+  if (hasRemote) {
+    try {
+      const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+      git(['push', '-u', 'origin', branch]);
+      return dirty ? 'Committed and pushed.' : 'Already up to date; pushed.';
+    } catch (err) {
+      return `Committed locally; push failed: ${(err as Error).message}`;
+    }
+  }
+  return dirty ? 'Committed locally (no remote configured).' : 'Nothing to commit.';
 }
 
 export function regenerateIndex(): void {
