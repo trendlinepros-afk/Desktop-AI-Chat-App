@@ -68,23 +68,42 @@ export function SettingsModal() {
             />
           </Section>
 
-          {/* Vault */}
-          <Section title="Master Brain Vault">
+          {/* Memory (Obsidian) */}
+          <Section title="Memory (Obsidian vault)">
             <div className="flex items-center gap-2">
               <input
                 readOnly
-                value={draft.vaultPath || 'No vault folder selected'}
+                value={draft.vaultPath || 'No memory — running without a vault'}
                 className="flex-1 truncate rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-text-muted"
               />
               <button
                 onClick={pickVault}
                 className="rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent/90"
               >
-                Change…
+                {draft.vaultPath ? 'Change…' : 'Choose vault folder'}
               </button>
+              {draft.vaultPath && (
+                <button
+                  onClick={() => update({ vaultPath: '' })}
+                  title="Turn memory off"
+                  className="rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+                >
+                  Disable
+                </button>
+              )}
             </div>
             <p className="mt-1 text-xs text-text-muted">
-              A <code>WickedBrain/</code> folder of Obsidian-compatible markdown notes is created here.
+              Memory is stored as markdown notes inside an <strong>Obsidian vault</strong> (a{' '}
+              <code>WickedBrain/</code> folder is created in it). Choose your Obsidian vault folder to
+              enable memory, or leave it unset to use WICKED without any long-term memory. New to
+              Obsidian? Install it from{' '}
+              <button
+                className="text-accent underline"
+                onClick={() => window.polyglot.openExternal('https://obsidian.md')}
+              >
+                obsidian.md
+              </button>
+              , create a vault, then point WICKED at that folder.
             </p>
           </Section>
 

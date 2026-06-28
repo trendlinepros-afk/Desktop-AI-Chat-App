@@ -49,47 +49,49 @@ const STEPS: Step[] = [
   },
   {
     emoji: '🧠',
-    title: 'The Master Brain',
+    title: 'Memory: Obsidian, or none',
     body: (
       <>
-        <p>
-          In Settings, choose a <strong>vault folder</strong>. WICKED creates an
-          Obsidian-compatible <code>WickedBrain/</code> of markdown notes there.
-        </p>
+        <p>WICKED's long-term memory lives in an Obsidian vault. You have two choices:</p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>
+            <strong>Use Obsidian</strong> (recommended) — point WICKED at an Obsidian vault and it
+            remembers across sessions. Setup is on the next screen.
+          </li>
+          <li>
+            <strong>No memory</strong> — leave the vault unset in Settings and WICKED is a plain
+            multi-model chat; nothing is stored long-term.
+          </li>
+        </ul>
         <p className="mt-2">
-          With the amber <strong>🧠 Brain</strong> toggle ON, relevant notes are automatically fed
-          to the model before each message. Click <strong>✓ End &amp; Review</strong> to summarize a
-          chat and save it back to the vault — so every session builds on the last.
+          With memory on, the amber <strong>🧠 Brain</strong> toggle feeds relevant notes to the
+          model before each message, and <strong>✓ End &amp; Review</strong> summarizes a chat back
+          into the vault — so every session builds on the last.
         </p>
       </>
     ),
   },
   {
     emoji: '🟣',
-    title: 'Use it with Obsidian (optional)',
+    title: 'Set up Obsidian',
     body: (
       <>
-        <p>
-          WICKED writes plain markdown, so the vault works on its own. But you can also open it in{' '}
-          <strong>Obsidian</strong> to browse, edit, and see links between notes:
-        </p>
+        <p>To enable memory, set up an Obsidian vault and connect it:</p>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
           <li>
-            Install <strong>Obsidian</strong> (obsidian.md) — it's free.
+            Install <strong>Obsidian</strong> from obsidian.md (free), open it, and{' '}
+            <strong>“Create new vault”</strong> — pick a folder and name (e.g. <code>WICKED</code>).
           </li>
           <li>
-            In Obsidian choose <strong>“Open folder as vault”</strong> and select the folder you
-            picked in WICKED (or the <code>WickedBrain</code> folder inside it).
+            In WICKED, open <strong>Settings → Memory (Obsidian vault)</strong> and click{' '}
+            <strong>Choose vault folder</strong>, selecting that same Obsidian vault folder.
           </li>
           <li>
-            Your notes, the <code>_index.md</code>, and the <code>Ideas/</code> &amp;{' '}
-            <code>Projects/</code> sections appear instantly — edits sync both ways since it's the
-            same files.
+            WICKED writes its notes there; back in Obsidian they appear live with backlinks and the
+            graph. Any note's <strong>“Edit in Obsidian”</strong> button opens it directly.
           </li>
         </ol>
-        <p className="mt-2 text-text-muted">
-          Tip: any note in WICKED's Brain panel has an <strong>“Edit in Obsidian”</strong> button.
-        </p>
+        <p className="mt-2 text-text-muted">Prefer no memory? Just skip this and leave it unset.</p>
       </>
     ),
   },

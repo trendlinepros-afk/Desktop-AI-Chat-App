@@ -34,12 +34,12 @@ export function ChatWindow() {
           <div className="text-5xl">🔮</div>
           <h2 className="mt-4 text-xl font-semibold">One window. Every model. One memory.</h2>
           <p className="mt-2 max-w-sm text-sm text-text-muted">
-            Create a new chat to get started. Toggle the 🧠 Brain to let every model read from and
-            write to your Obsidian-compatible knowledge vault.
+            Create a new chat to get started. Connect an Obsidian vault to give every model a shared
+            long-term memory — or skip it and just chat.
           </p>
           {!vaultPath && (
             <p className="mt-3 text-xs text-brain">
-              Tip: set your vault folder in Settings ⚙️ to enable the Master Brain.
+              Tip: choose an Obsidian vault in Settings ⚙️ to turn on memory (optional).
             </p>
           )}
         </div>
