@@ -5,7 +5,8 @@ import { useChatStore } from '../../store/chatStore';
 import { useBrainStore } from '../../store/brainStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { ThemeToggle } from '../ThemeToggle';
-import { listOllamaModels } from '../../lib/ollama';
+import { listOllamaModels, listRunningOllamaModels, setOllamaLoaded } from '../../lib/ollama';
+import { useUIStore } from '../../store/uiStore';
 
 export function ModelSelector({ chat }: { chat: Chat }) {
   const setChatModel = useChatStore((s) => s.setChatModel);
@@ -15,7 +16,10 @@ export function ModelSelector({ chat }: { chat: Chat }) {
   const setImageGen = useChatStore((s) => s.setImageGen);
   const togglePanel = useBrainStore((s) => s.togglePanel);
   const ollamaBaseUrl = useSettingsStore((s) => s.settings.ollamaBaseUrl);
+  const toast = useUIStore((s) => s.toast);
   const [ollamaModels, setOllamaModels] = useState<ModelVersion[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loadingBusy, setLoadingBusy] = useState(false);
 
   const cfg = MODEL_CONFIG[chat.provider];
 
@@ -30,6 +34,36 @@ export function ModelSelector({ chat }: { chat: Chat }) {
       cancelled = true;
     };
   }, [chat.provider, ollamaBaseUrl]);
+
+  // Track whether the selected Ollama model is currently resident in memory.
+  useEffect(() => {
+    if (chat.provider !== 'ollama') return;
+    let cancelled = false;
+    const check = () =>
+      listRunningOllamaModels(ollamaBaseUrl).then((running) => {
+        if (!cancelled)
+          setLoaded(running.some((m) => m === chat.modelVersion || m.startsWith(`${chat.modelVersion}:`)));
+      });
+    check();
+    const t = setInterval(check, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [chat.provider, chat.modelVersion, ollamaBaseUrl]);
+
+  const toggleLoaded = async () => {
+    setLoadingBusy(true);
+    try {
+      await setOllamaLoaded(ollamaBaseUrl, chat.modelVersion, !loaded);
+      setLoaded(!loaded);
+      toast(!loaded ? `Loaded ${chat.modelVersion}` : `Unloaded ${chat.modelVersion}`, 'success');
+    } catch (err) {
+      toast(`Ollama: ${(err as Error).message}`, 'error');
+    } finally {
+      setLoadingBusy(false);
+    }
+  };
 
   const onProvider = (provider: Provider) => {
     const version = defaultVersionFor(provider);
@@ -77,6 +111,22 @@ export function ModelSelector({ chat }: { chat: Chat }) {
           </option>
         ))}
       </select>
+
+      {/* Ollama load/unload toggle */}
+      {chat.provider === 'ollama' && (
+        <button
+          onClick={toggleLoaded}
+          disabled={loadingBusy}
+          title={loaded ? 'Model is resident in memory — click to unload' : 'Load model into memory'}
+          className={`rounded-lg px-3 py-1 transition disabled:opacity-50 ${
+            loaded
+              ? 'bg-idea/20 text-idea ring-1 ring-idea/40'
+              : 'border border-edge text-text-muted hover:text-text-primary'
+          }`}
+        >
+          {loadingBusy ? '…' : loaded ? '⏏ Loaded' : '▶ Load'}
+        </button>
+      )}
 
       <div className="flex-1" />
 

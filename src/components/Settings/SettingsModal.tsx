@@ -4,6 +4,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
 import { MODEL_CONFIG, PROVIDERS, defaultVersionFor } from '../ModelSelector/modelConfig';
 import { McpServerSettings } from './McpServerSettings';
+import { OllamaModelManager } from './OllamaModelManager';
 import { listOllamaModels } from '../../lib/ollama';
 
 export function SettingsModal() {
@@ -14,6 +15,7 @@ export function SettingsModal() {
   const save = useSettingsStore((s) => s.save);
 
   const [draft, setDraft] = useState<Settings>(settings);
+  const [managerOpen, setManagerOpen] = useState(false);
 
   useEffect(() => {
     if (open) setDraft(settings);
@@ -154,6 +156,12 @@ export function SettingsModal() {
               >
                 Test
               </button>
+              <button
+                onClick={() => setManagerOpen(true)}
+                className="rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent/90"
+              >
+                Manage models
+              </button>
             </div>
             <p className="mt-1 text-xs text-text-muted">
               Run models locally with no API key or usage cost. Install{' '}
@@ -189,6 +197,10 @@ export function SettingsModal() {
           </button>
         </div>
       </div>
+
+      {managerOpen && (
+        <OllamaModelManager baseUrl={draft.ollamaBaseUrl} onClose={() => setManagerOpen(false)} />
+      )}
     </div>
   );
 }

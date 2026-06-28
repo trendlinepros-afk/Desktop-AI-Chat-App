@@ -9,6 +9,8 @@ import { VaultContextBadge } from '../Brain/VaultContextBadge';
 import { MemoryReviewModal } from '../Brain/MemoryReviewModal';
 import { ThemeToggle } from '../ThemeToggle';
 import { SuggestionBanner } from './SuggestionBanner';
+import { SystemPromptModal } from './SystemPromptModal';
+import { BuildPromptModal } from '../Plan/BuildPromptModal';
 
 export function ChatWindow() {
   const activeChatId = useChatStore((s) => s.activeChatId);
@@ -16,6 +18,8 @@ export function ChatWindow() {
   const vaultPath = useSettingsStore((s) => s.settings.vaultPath);
   const [linkOpen, setLinkOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [personaOpen, setPersonaOpen] = useState(false);
+  const [buildOpen, setBuildOpen] = useState(false);
 
   const chat = chats.find((c) => c.id === activeChatId) ?? null;
 
@@ -50,6 +54,22 @@ export function ChatWindow() {
       <div className="flex items-center gap-2 border-b border-edge bg-chat px-4 py-2">
         <h2 className="flex-1 truncate text-sm font-medium">{chat.title}</h2>
         <VaultContextBadge chatId={chat.id} />
+        <button
+          onClick={() => setPersonaOpen(true)}
+          title="Edit this chat's system prompt / persona"
+          className={`rounded-md px-2 py-1 text-sm hover:bg-hover hover:text-text-primary ${
+            chat.systemPrompt ? 'text-accent' : 'text-text-muted'
+          }`}
+        >
+          🎭 Persona
+        </button>
+        <button
+          onClick={() => setBuildOpen(true)}
+          title="Compile this conversation into a build prompt"
+          className="rounded-md border border-accent/30 px-2 py-1 text-sm text-accent hover:bg-accent/10"
+        >
+          📦 Build Prompt
+        </button>
         <div className="relative">
           <button
             onClick={() => setLinkOpen((v) => !v)}
@@ -74,6 +94,8 @@ export function ChatWindow() {
       <InputArea chat={chat} />
 
       {reviewOpen && <MemoryReviewModal chat={chat} onClose={() => setReviewOpen(false)} />}
+      {personaOpen && <SystemPromptModal chat={chat} onClose={() => setPersonaOpen(false)} />}
+      {buildOpen && <BuildPromptModal chat={chat} onClose={() => setBuildOpen(false)} />}
     </div>
   );
 }
