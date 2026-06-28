@@ -10,7 +10,7 @@ on:
 jobs:
   # Fast feedback on every push / PR: typecheck + production build.
   verify:
-    if: startsWith(github.ref, 'refs/tags/') == false
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,9 +24,11 @@ jobs:
       - name: Typecheck + build
         run: npm run build
 
-  # Build and publish the Windows installer on a version tag (vX.Y.Z).
+  # Build and publish the Windows installer — on a version tag (vX.Y.Z) or when
+  # run manually from the Actions tab ("Run workflow"). electron-builder publishes
+  # a GitHub Release named v<package.json version> with the installer + latest.yml.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
     runs-on: windows-latest
