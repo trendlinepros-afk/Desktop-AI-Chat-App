@@ -40,6 +40,8 @@ const DEFAULT_SETTINGS: Settings = {
   defaultModelVersion: 'gpt-4o',
   semanticIndexingEnabled: true,
   ollamaBaseUrl: 'http://localhost:11434',
+  autoMemoryEnabled: false,
+  autoMemoryIntervalMinutes: 30,
 };
 
 export function initDb(): void {
@@ -105,6 +107,12 @@ export function initDb(): void {
   if (!columnExists('chats', 'deleted_at')) {
     db.exec('ALTER TABLE chats ADD COLUMN deleted_at INTEGER');
   }
+  if (!columnExists('chats', 'no_memory')) {
+    db.exec('ALTER TABLE chats ADD COLUMN no_memory INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!columnExists('chats', 'last_committed_at')) {
+    db.exec('ALTER TABLE chats ADD COLUMN last_committed_at INTEGER NOT NULL DEFAULT 0');
+  }
 
   purgeExpiredChats();
 }
@@ -169,6 +177,8 @@ interface ChatRow {
   created_at: number;
   updated_at: number;
   system_prompt: string | null;
+  no_memory: number | null;
+  last_committed_at: number | null;
 }
 
 function mapChat(r: ChatRow): Chat {
@@ -181,6 +191,8 @@ function mapChat(r: ChatRow): Chat {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     systemPrompt: r.system_prompt ?? '',
+    noMemory: !!r.no_memory,
+    lastCommittedAt: r.last_committed_at ?? 0,
   };
 }
 
@@ -226,6 +238,8 @@ export function createChat(data: {
     created_at: now,
     updated_at: now,
     system_prompt: '',
+    no_memory: 0,
+    last_committed_at: 0,
   };
   db.prepare(
     `INSERT INTO chats (id, title, folder_id, provider, model_version, created_at, updated_at, system_prompt)
@@ -270,6 +284,17 @@ export function updateChatSystemPrompt(id: string, systemPrompt: string): void {
     Date.now(),
     id
   );
+}
+
+// Per-chat opt-out of memory (skipped by the scheduled auto-commit). Does NOT
+// bump updated_at — toggling this shouldn't look like new chat activity.
+export function updateChatNoMemory(id: string, noMemory: boolean): void {
+  db.prepare('UPDATE chats SET no_memory = ? WHERE id = ?').run(noMemory ? 1 : 0, id);
+}
+
+// Mark when a chat was last committed to memory.
+export function updateChatCommitted(id: string, ts: number): void {
+  db.prepare('UPDATE chats SET last_committed_at = ? WHERE id = ?').run(ts, id);
 }
 
 export function touchChat(id: string): void {
@@ -510,6 +535,12 @@ export function getSettings(): Settings {
       ? map.get('semanticIndexingEnabled') === 'true'
       : DEFAULT_SETTINGS.semanticIndexingEnabled,
     ollamaBaseUrl: map.get('ollamaBaseUrl') ?? DEFAULT_SETTINGS.ollamaBaseUrl,
+    autoMemoryEnabled: map.has('autoMemoryEnabled')
+      ? map.get('autoMemoryEnabled') === 'true'
+      : DEFAULT_SETTINGS.autoMemoryEnabled,
+    autoMemoryIntervalMinutes: map.has('autoMemoryIntervalMinutes')
+      ? Number(map.get('autoMemoryIntervalMinutes'))
+      : DEFAULT_SETTINGS.autoMemoryIntervalMinutes,
   };
 }
 

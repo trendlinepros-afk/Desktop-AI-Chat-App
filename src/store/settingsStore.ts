@@ -17,6 +17,8 @@ const EMPTY: Settings = {
   defaultModelVersion: 'gpt-4o',
   semanticIndexingEnabled: true,
   ollamaBaseUrl: 'http://localhost:11434',
+  autoMemoryEnabled: false,
+  autoMemoryIntervalMinutes: 30,
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

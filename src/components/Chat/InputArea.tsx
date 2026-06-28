@@ -67,7 +67,8 @@ export function InputArea({ chat }: { chat: Chat }) {
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    // Enter sends; Shift+Enter inserts a newline. Ignore IME composition.
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       doSend();
     }
@@ -98,7 +99,7 @@ export function InputArea({ chat }: { chat: Chat }) {
             onPaste={onPaste}
             onKeyDown={onKeyDown}
             rows={1}
-            placeholder="Message… (Ctrl+Enter to send, paste images directly)"
+            placeholder="Message… (Enter to send, Shift+Enter for newline)"
             className="max-h-48 flex-1 resize-none bg-transparent py-2 text-sm text-text-primary outline-none placeholder:text-text-muted"
           />
           {isStreaming ? (

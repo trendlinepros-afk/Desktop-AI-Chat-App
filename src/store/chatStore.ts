@@ -15,6 +15,7 @@ interface ChatState {
   moveChat: (id: string, folderId: string | null) => Promise<void>;
   setChatModel: (id: string, provider: Provider, modelVersion: string) => Promise<void>;
   setSystemPrompt: (id: string, prompt: string) => Promise<void>;
+  setNoMemory: (id: string, noMemory: boolean) => Promise<void>;
   deleteChat: (id: string) => Promise<void>;
   removeMessage: (id: string) => Promise<void>;
   reloadMessages: (chatId: string) => Promise<void>;
@@ -79,6 +80,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setSystemPrompt: async (id, prompt) => {
     await window.polyglot.updateChatSystemPrompt(id, prompt);
     set({ chats: get().chats.map((c) => (c.id === id ? { ...c, systemPrompt: prompt } : c)) });
+  },
+
+  setNoMemory: async (id, noMemory) => {
+    await window.polyglot.setChatNoMemory(id, noMemory);
+    set({ chats: get().chats.map((c) => (c.id === id ? { ...c, noMemory } : c)) });
   },
 
   deleteChat: async (id) => {

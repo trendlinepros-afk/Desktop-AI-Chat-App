@@ -15,6 +15,8 @@ export interface Chat {
   createdAt: number;
   updatedAt: number;
   systemPrompt: string;
+  noMemory: boolean; // opt out of scheduled auto-commit to memory
+  lastCommittedAt: number; // when this chat was last saved to the vault
 }
 
 export interface DeletedChat extends Chat {
@@ -108,6 +110,8 @@ export interface Settings {
   defaultModelVersion: string;
   semanticIndexingEnabled: boolean;
   ollamaBaseUrl: string; // e.g. http://localhost:11434
+  autoMemoryEnabled: boolean; // periodically commit chats to memory
+  autoMemoryIntervalMinutes: number; // how often the scheduler runs
 }
 
 export const VAULT_CATEGORIES = [
@@ -138,6 +142,8 @@ export interface WickedAPI {
   deleteChat(id: string): Promise<void>;
   updateChatSystemPrompt(id: string, prompt: string): Promise<void>;
   branchChat(id: string, uptoCreatedAt: number): Promise<Chat | null>;
+  setChatNoMemory(id: string, noMemory: boolean): Promise<void>;
+  setChatCommitted(id: string, ts: number): Promise<void>;
   getDeletedChats(): Promise<DeletedChat[]>;
   restoreChat(id: string): Promise<void>;
   purgeChat(id: string): Promise<void>;
@@ -181,6 +187,12 @@ export interface WickedAPI {
   // Vault operations
   vaultReadAll(): Promise<VaultNote[]>;
   vaultWriteNote(category: string, filename: string, content: string): Promise<string>;
+  vaultWriteNoteForChat(
+    category: string,
+    filename: string,
+    content: string,
+    sourceChatId: string
+  ): Promise<string>;
   vaultReadNote(path: string): Promise<string>;
   vaultSearch(query: string): Promise<VaultNote[]>;
   vaultGetEmbeddings(): Promise<Record<string, number[]>>;

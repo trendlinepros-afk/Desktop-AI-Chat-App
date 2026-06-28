@@ -13,6 +13,7 @@ import { useBrainStore } from './store/brainStore';
 import { useUIStore } from './store/uiStore';
 import { useThemeStore } from './store/themeStore';
 import { useOnboardingStore } from './store/onboardingStore';
+import { useAutoMemory } from './hooks/useAutoMemory';
 
 export default function App() {
   const loadSettings = useSettingsStore((s) => s.load);
@@ -24,6 +25,9 @@ export default function App() {
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const initTheme = useThemeStore((s) => s.init);
   const initOnboarding = useOnboardingStore((s) => s.init);
+
+  // Scheduled auto-commit of chats to the memory vault.
+  useAutoMemory();
 
   useEffect(() => {
     initTheme();

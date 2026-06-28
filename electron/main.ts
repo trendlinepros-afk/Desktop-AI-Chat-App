@@ -127,6 +127,10 @@ function registerIpc(): void {
     db.updateChatSystemPrompt(id, prompt)
   );
   ipcMain.handle('chats:branch', (_e, id: string, upto: number) => db.branchChat(id, upto));
+  ipcMain.handle('chats:setNoMemory', (_e, id: string, v: boolean) => db.updateChatNoMemory(id, v));
+  ipcMain.handle('chats:setCommitted', (_e, id: string, ts: number) =>
+    db.updateChatCommitted(id, ts)
+  );
   ipcMain.handle('chats:getDeleted', () => db.getDeletedChats());
   ipcMain.handle('chats:restore', (_e, id: string) => db.restoreChat(id));
   ipcMain.handle('chats:purge', (_e, id: string) => db.purgeChat(id));
@@ -196,6 +200,11 @@ function registerIpc(): void {
   ipcMain.handle('vault:readAll', () => safeVault(() => vault.readAll(), []));
   ipcMain.handle('vault:writeNote', (_e, category: string, filename: string, content: string) =>
     vault.writeNote(category, filename, content)
+  );
+  ipcMain.handle(
+    'vault:writeNoteForChat',
+    (_e, category: string, filename: string, content: string, sourceChatId: string) =>
+      vault.writeNoteForChat(category, filename, content, sourceChatId)
   );
   ipcMain.handle('vault:readNote', (_e, p: string) => vault.readNote(p));
   ipcMain.handle('vault:search', (_e, query: string) => safeVault(() => vault.search(query), []));

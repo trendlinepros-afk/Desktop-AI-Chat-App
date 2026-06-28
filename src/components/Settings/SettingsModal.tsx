@@ -157,6 +157,40 @@ export function SettingsModal() {
             </p>
           </Section>
 
+          {/* Scheduled memory */}
+          <Section title="Scheduled memory">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={draft.autoMemoryEnabled}
+                onChange={(e) => update({ autoMemoryEnabled: e.target.checked })}
+                className="accent-brain"
+              />
+              Automatically commit chats to memory on a schedule
+            </label>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-sm text-text-muted">Run every</span>
+              <select
+                value={draft.autoMemoryIntervalMinutes}
+                onChange={(e) => update({ autoMemoryIntervalMinutes: Number(e.target.value) })}
+                disabled={!draft.autoMemoryEnabled}
+                className="rounded-lg border border-edge bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent disabled:opacity-50"
+              >
+                {[15, 30, 60, 120, 240].map((m) => (
+                  <option key={m} value={m}>
+                    {m < 60 ? `${m} minutes` : `${m / 60} hour${m === 60 ? '' : 's'}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              Saves every chat with new activity to your vault (updating existing notes in place),
+              and re-saves previously-stored chats that gained new messages. Chats marked
+              <strong> “Don't save to memory” </strong> in their header are skipped. Requires a vault
+              and an API key for each chat's model.
+            </p>
+          </Section>
+
           {/* Ollama (local LLM) */}
           <Section title="Ollama (local LLM)">
             <div className="flex items-center gap-2">

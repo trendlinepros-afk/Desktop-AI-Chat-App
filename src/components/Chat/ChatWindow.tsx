@@ -16,6 +16,7 @@ import { UsageMeter } from './UsageMeter';
 export function ChatWindow() {
   const activeChatId = useChatStore((s) => s.activeChatId);
   const chats = useChatStore((s) => s.chats);
+  const setNoMemory = useChatStore((s) => s.setNoMemory);
   const vaultPath = useSettingsStore((s) => s.settings.vaultPath);
   const [linkOpen, setLinkOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -55,6 +56,19 @@ export function ChatWindow() {
       <div className="flex items-center gap-2 border-b border-edge bg-chat px-4 py-2">
         <h2 className="flex-1 truncate text-sm font-medium">{chat.title}</h2>
         <UsageMeter chat={chat} />
+        <button
+          onClick={() => setNoMemory(chat.id, !chat.noMemory)}
+          title={
+            chat.noMemory
+              ? 'This chat is excluded from scheduled memory saves — click to include it'
+              : 'Exclude this chat from scheduled memory saves'
+          }
+          className={`rounded-md px-2 py-1 text-sm hover:bg-hover ${
+            chat.noMemory ? 'text-red-400' : 'text-text-muted hover:text-text-primary'
+          }`}
+        >
+          {chat.noMemory ? '🚫 No memory' : '💾 Memory'}
+        </button>
         <VaultContextBadge chatId={chat.id} />
         <button
           onClick={() => setPersonaOpen(true)}

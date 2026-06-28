@@ -12,6 +12,8 @@ const api: WickedAPI = {
   deleteChat: (id) => ipcRenderer.invoke('chats:delete', id),
   updateChatSystemPrompt: (id, prompt) => ipcRenderer.invoke('chats:updateSystemPrompt', id, prompt),
   branchChat: (id, upto) => ipcRenderer.invoke('chats:branch', id, upto),
+  setChatNoMemory: (id, v) => ipcRenderer.invoke('chats:setNoMemory', id, v),
+  setChatCommitted: (id, ts) => ipcRenderer.invoke('chats:setCommitted', id, ts),
   getDeletedChats: () => ipcRenderer.invoke('chats:getDeleted'),
   restoreChat: (id) => ipcRenderer.invoke('chats:restore', id),
   purgeChat: (id) => ipcRenderer.invoke('chats:purge', id),
@@ -54,6 +56,8 @@ const api: WickedAPI = {
   vaultReadAll: () => ipcRenderer.invoke('vault:readAll'),
   vaultWriteNote: (category, filename, content) =>
     ipcRenderer.invoke('vault:writeNote', category, filename, content),
+  vaultWriteNoteForChat: (category, filename, content, sourceChatId) =>
+    ipcRenderer.invoke('vault:writeNoteForChat', category, filename, content, sourceChatId),
   vaultReadNote: (p) => ipcRenderer.invoke('vault:readNote', p),
   vaultSearch: (query) => ipcRenderer.invoke('vault:search', query),
   vaultGetEmbeddings: () => ipcRenderer.invoke('vault:getEmbeddings'),

@@ -112,7 +112,14 @@ export function useMemoryReview() {
     ): Promise<{ notePath: string; ideaPaths: string[] }> => {
       const title = chat.title && chat.title !== 'New Chat' ? chat.title : review.summary.slice(0, 40);
       const noteMd = buildNoteMarkdown(title, review, chat.id);
-      const notePath = await window.polyglot.vaultWriteNote(review.category, title, noteMd);
+      // Overwrite this chat's existing note (matched by source_chat_id) so
+      // re-commits update in place instead of creating duplicates.
+      const notePath = await window.polyglot.vaultWriteNoteForChat(
+        review.category,
+        title,
+        noteMd,
+        chat.id
+      );
 
       // Write a separate idea note for each detected idea.
       const ideaPaths: string[] = [];

@@ -140,6 +140,28 @@ export function writeNote(category: string, filename: string, content: string): 
   return rel;
 }
 
+// Write a note for a chat, overwriting the existing note for that chat if one
+// exists (matched by `source_chat_id` frontmatter). Keeps one note per chat so
+// scheduled re-commits update rather than pile up duplicates.
+export function writeNoteForChat(
+  category: string,
+  filename: string,
+  content: string,
+  sourceChatId: string
+): string {
+  const root = vaultRoot();
+  for (const rel of walkMarkdown(root, root)) {
+    const raw = fs.readFileSync(path.join(root, rel), 'utf-8');
+    const { data } = parseFrontmatter(raw);
+    if (data.source_chat_id === sourceChatId) {
+      fs.writeFileSync(path.join(root, rel), content, 'utf-8');
+      regenerateIndex();
+      return rel.split(path.sep).join('/');
+    }
+  }
+  return writeNote(category, filename, content);
+}
+
 export function search(query: string): VaultNote[] {
   const terms = query
     .toLowerCase()
