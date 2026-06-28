@@ -17,6 +17,11 @@ export function Message({ message, chat }: { message: MessageType; chat: Chat })
   const images = message.content.filter((p) => p.type === 'image_url' && p.image_url?.url);
   const files = message.content.filter((p) => p.type === 'file');
 
+  // Tag the bubble with the model that actually produced THIS message, falling
+  // back to the chat's current model for older messages without it recorded.
+  const msgProvider = message.provider ?? chat.provider;
+  const msgModel = message.modelVersion ?? chat.modelVersion;
+
   const { deleteMessage, regenerateFrom, editAndResend, branchFrom } = useMessageActions(chat);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
@@ -33,9 +38,9 @@ export function Message({ message, chat }: { message: MessageType; chat: Chat })
             <span className="flex items-center gap-1.5">
               <span
                 className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: providerColor(chat.provider) }}
+                style={{ backgroundColor: providerColor(msgProvider) }}
               />
-              {versionLabel(chat.provider, chat.modelVersion)}
+              {versionLabel(msgProvider, msgModel)}
             </span>
           )}
         </div>

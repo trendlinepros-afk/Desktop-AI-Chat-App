@@ -91,7 +91,11 @@ export function useSend() {
     async (chat: Chat, assembled: Message[], autoTitleFrom?: string) => {
       const isActive = () => useChatStore.getState().activeChatId === chat.id;
 
-      const assistantMsg = makeMessage(chat.id, 'assistant', [{ type: 'text', text: '' }]);
+      const assistantMsg: Message = {
+        ...makeMessage(chat.id, 'assistant', [{ type: 'text', text: '' }]),
+        provider: chat.provider,
+        modelVersion: chat.modelVersion,
+      };
       addMessage(assistantMsg);
 
       bufferRef.current = '';
@@ -120,7 +124,13 @@ export function useSend() {
 
       const finalContent: ContentPart[] = [{ type: 'text', text: finalText }];
       if (isActive()) updateLastAssistant(finalContent);
-      await window.polyglot.saveMessage({ chatId: chat.id, role: 'assistant', content: finalContent });
+      await window.polyglot.saveMessage({
+        chatId: chat.id,
+        role: 'assistant',
+        content: finalContent,
+        provider: chat.provider,
+        modelVersion: chat.modelVersion,
+      });
       // Re-sync from the DB so the store holds real row ids/timestamps (needed
       // for delete / regenerate / branch to target the right rows).
       await useChatStore.getState().reloadMessages(chat.id);
@@ -159,8 +169,18 @@ export function useSend() {
         try {
           const dataUrl = await generateImage(settings.geminiApiKey, chat.modelVersion, userText);
           const content: ContentPart[] = [{ type: 'image_url', image_url: { url: dataUrl } }];
-          addMessage(makeMessage(chat.id, 'assistant', content));
-          await window.polyglot.saveMessage({ chatId: chat.id, role: 'assistant', content });
+          addMessage({
+            ...makeMessage(chat.id, 'assistant', content),
+            provider: chat.provider,
+            modelVersion: chat.modelVersion,
+          });
+          await window.polyglot.saveMessage({
+            chatId: chat.id,
+            role: 'assistant',
+            content,
+            provider: chat.provider,
+            modelVersion: chat.modelVersion,
+          });
           await useChatStore.getState().reloadMessages(chat.id);
         } catch (err) {
           toast(`Image generation failed: ${(err as Error).message}`, 'error');

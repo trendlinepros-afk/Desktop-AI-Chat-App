@@ -54,6 +54,10 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: ContentPart[];
   createdAt: number;
+  // The model that produced this message (assistant messages), so the bubble
+  // tag is stable even if the chat's model is later changed.
+  provider?: Provider;
+  modelVersion?: string;
 }
 
 export interface VaultNote {
@@ -161,6 +165,8 @@ export interface WickedAPI {
     chatId: string;
     role: Message['role'];
     content: ContentPart[];
+    provider?: Provider;
+    modelVersion?: string;
   }): Promise<Message>;
   deleteMessage(id: string): Promise<void>;
   deleteMessagesFrom(chatId: string, createdAt: number): Promise<void>;

@@ -113,6 +113,14 @@ export function initDb(): void {
   if (!columnExists('chats', 'last_committed_at')) {
     db.exec('ALTER TABLE chats ADD COLUMN last_committed_at INTEGER NOT NULL DEFAULT 0');
   }
+  // Record which model produced each message so bubbles stay tagged correctly
+  // even after switching models mid-chat.
+  if (!columnExists('messages', 'provider')) {
+    db.exec('ALTER TABLE messages ADD COLUMN provider TEXT');
+  }
+  if (!columnExists('messages', 'model_version')) {
+    db.exec('ALTER TABLE messages ADD COLUMN model_version TEXT');
+  }
 
   purgeExpiredChats();
 }
@@ -349,6 +357,8 @@ interface MessageRow {
   role: string;
   content: string;
   created_at: number;
+  provider: string | null;
+  model_version: string | null;
 }
 
 function mapMessage(r: MessageRow): Message {
@@ -358,6 +368,8 @@ function mapMessage(r: MessageRow): Message {
     role: r.role as Message['role'],
     content: JSON.parse(r.content),
     createdAt: r.created_at,
+    provider: (r.provider as Provider) ?? undefined,
+    modelVersion: r.model_version ?? undefined,
   };
 }
 
@@ -373,6 +385,8 @@ export function saveMessage(msg: {
   chatId: string;
   role: Message['role'];
   content: Message['content'];
+  provider?: Provider;
+  modelVersion?: string;
 }): Message {
   // Guarantee strictly-increasing timestamps within a chat so range deletes
   // (regenerate / edit-and-resend) can't accidentally catch a sibling saved in
@@ -387,10 +401,12 @@ export function saveMessage(msg: {
     role: msg.role,
     content: JSON.stringify(msg.content),
     created_at: createdAt,
+    provider: msg.provider ?? null,
+    model_version: msg.modelVersion ?? null,
   };
   db.prepare(
-    'INSERT INTO messages (id, chat_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
-  ).run(row.id, row.chat_id, row.role, row.content, row.created_at);
+    'INSERT INTO messages (id, chat_id, role, content, created_at, provider, model_version) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(row.id, row.chat_id, row.role, row.content, row.created_at, row.provider, row.model_version);
   touchChat(msg.chatId);
   return mapMessage(row);
 }
