@@ -21,8 +21,13 @@ export interface SendOptions {
 
 function partsToText(parts: ContentPart[]): string {
   return parts
-    .filter((p) => p.type === 'text' && p.text)
-    .map((p) => p.text)
+    .map((p) => {
+      if (p.type === 'text' && p.text) return p.text;
+      // Include extracted text from attached documents so the model can read them.
+      if (p.type === 'file' && p.text) return `\n[Attached file: ${p.name ?? 'file'}]\n${p.text}`;
+      return '';
+    })
+    .filter(Boolean)
     .join('\n');
 }
 
@@ -43,6 +48,9 @@ function formatForOpenAI(messages: Message[]): ChatCompletionMessageParam[] {
       .map((p) => {
         if (p.type === 'text' && p.text) {
           return { type: 'text' as const, text: p.text };
+        }
+        if (p.type === 'file' && p.text) {
+          return { type: 'text' as const, text: `[Attached file: ${p.name ?? 'file'}]\n${p.text}` };
         }
         if (p.type === 'image_url' && p.image_url?.url) {
           return { type: 'image_url' as const, image_url: { url: p.image_url.url } };
@@ -72,6 +80,9 @@ function formatForGemini(messages: Message[]): { system?: string; contents: Cont
     const parts: Content['parts'] = [];
     for (const p of m.content) {
       if (p.type === 'text' && p.text) parts.push({ text: p.text });
+      if (p.type === 'file' && p.text) {
+        parts.push({ text: `[Attached file: ${p.name ?? 'file'}]\n${p.text}` });
+      }
       if (p.type === 'image_url' && p.image_url?.url) {
         const inline = dataUrlToInline(p.image_url.url);
         if (inline) parts.push({ inlineData: inline });

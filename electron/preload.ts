@@ -77,6 +77,7 @@ const api: WickedAPI = {
   // Updates
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
 
   // Shell
   openExternal: (p) => ipcRenderer.invoke('shell:openExternal', p),

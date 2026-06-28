@@ -1,7 +1,10 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import electronUpdater from 'electron-updater';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+
+const { autoUpdater } = electronUpdater;
 import * as db from './db';
 import * as vault from './vault';
 import * as mcp from './mcp';
@@ -89,6 +92,23 @@ function mimeFromExt(ext: string): string {
   return map[ext.toLowerCase()] || 'application/octet-stream';
 }
 
+// Pull readable text out of an attachment when possible (PDF / txt / md).
+async function extractText(buffer: Buffer, ext: string): Promise<string | undefined> {
+  try {
+    if (ext === '.txt' || ext === '.md') return buffer.toString('utf-8').slice(0, 100_000);
+    if (ext === '.pdf') {
+      const mod = (await import('pdf-parse')) as unknown as {
+        default: (b: Buffer) => Promise<{ text: string }>;
+      };
+      const parsed = await mod.default(buffer);
+      return parsed.text.slice(0, 100_000);
+    }
+  } catch (err) {
+    console.warn('[extractText]', (err as Error).message);
+  }
+  return undefined;
+}
+
 function registerIpc(): void {
   // ----- Chats -----
   ipcMain.handle('chats:getAll', () => db.getChats());
@@ -155,8 +175,12 @@ function registerIpc(): void {
     if (result.canceled || result.filePaths.length === 0) return null;
     const filePath = result.filePaths[0];
     const ext = path.extname(filePath);
-    const data = fs.readFileSync(filePath).toString('base64');
-    return { name: path.basename(filePath), mime: mimeFromExt(ext), data };
+    const buffer = fs.readFileSync(filePath);
+    const mime = mimeFromExt(ext);
+    const data = buffer.toString('base64');
+    // Extract text from documents so the model can actually read them.
+    const text = await extractText(buffer, ext.toLowerCase());
+    return { name: path.basename(filePath), mime, data, text };
   });
 
   ipcMain.handle('dialog:openVaultFolder', async () => {
@@ -246,6 +270,30 @@ function registerIpc(): void {
     } catch (err) {
       return { current, latest: null, hasUpdate: false, url: '', error: (err as Error).message };
     }
+  });
+
+  // Download & install an update via electron-updater (packaged builds only).
+  ipcMain.handle('update:install', async () => {
+    if (!app.isPackaged) {
+      return 'Auto-install only works in the installed app. Use the download link instead.';
+    }
+    autoUpdater.autoDownload = false;
+    return await new Promise<string>((resolve) => {
+      autoUpdater.removeAllListeners();
+      autoUpdater.on('error', (e) => resolve(`Update error: ${e.message}`));
+      autoUpdater.on('update-not-available', () => resolve('You are already on the latest version.'));
+      autoUpdater.on('update-available', () => {
+        autoUpdater.downloadUpdate().catch((e) => resolve(`Download failed: ${e.message}`));
+      });
+      autoUpdater.on('download-progress', (p) => {
+        win?.webContents.send('update:progress', Math.round(p.percent));
+      });
+      autoUpdater.on('update-downloaded', () => {
+        resolve('Update downloaded — restarting to install…');
+        setTimeout(() => autoUpdater.quitAndInstall(), 1000);
+      });
+      autoUpdater.checkForUpdates().catch((e) => resolve(`Update check failed: ${e.message}`));
+    });
   });
 
   // ----- Shell -----

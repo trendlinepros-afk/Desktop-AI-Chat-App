@@ -34,12 +34,25 @@ export function UpdateChecker() {
 
       {result && !result.error && (
         result.hasUpdate ? (
-          <button
-            onClick={() => window.polyglot.openExternal(result.url)}
-            className="rounded-md bg-accent/20 px-2.5 py-1 text-accent hover:bg-accent/30"
-          >
-            ⬆ Update available: v{result.latest} — download
-          </button>
+          <span className="flex items-center gap-2">
+            <span className="text-accent">⬆ v{result.latest} available</span>
+            <button
+              onClick={async () => {
+                const msg = await window.polyglot.installUpdate();
+                setResult((r) => (r ? { ...r } : r));
+                alert(msg);
+              }}
+              className="rounded-md bg-accent/20 px-2.5 py-1 text-accent hover:bg-accent/30"
+            >
+              ⤓ Install
+            </button>
+            <button
+              onClick={() => window.polyglot.openExternal(result.url)}
+              className="rounded-md border border-edge px-2.5 py-1 text-text-muted hover:text-text-primary"
+            >
+              download
+            </button>
+          </span>
         ) : (
           <span className="text-idea">
             ✓ You’re on the latest version

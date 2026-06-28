@@ -48,7 +48,7 @@ export function InputArea({ chat }: { chat: Chat }) {
     } else {
       setAttachments((prev) => [
         ...prev,
-        { type: 'file', name: file.name, mime: file.mime, data: file.data },
+        { type: 'file', name: file.name, mime: file.mime, data: file.data, text: file.text },
       ]);
     }
   };

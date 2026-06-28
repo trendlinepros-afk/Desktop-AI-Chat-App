@@ -175,7 +175,7 @@ export interface WickedAPI {
   saveSettings(partial: Partial<Settings>): Promise<void>;
 
   // File dialogs
-  openFileDialog(): Promise<{ name: string; mime: string; data: string } | null>;
+  openFileDialog(): Promise<{ name: string; mime: string; data: string; text?: string } | null>;
   openVaultFolderDialog(): Promise<string | null>;
 
   // Vault operations
@@ -204,6 +204,7 @@ export interface WickedAPI {
   // Updates
   getAppVersion(): Promise<string>;
   checkForUpdates(): Promise<UpdateCheckResult>;
+  installUpdate(): Promise<string>;
 
   // Shell
   openExternal(path: string): Promise<void>;
