@@ -10,6 +10,22 @@ const api: WickedAPI = {
   updateChatModel: (id, provider, modelVersion) =>
     ipcRenderer.invoke('chats:updateModel', id, provider, modelVersion),
   deleteChat: (id) => ipcRenderer.invoke('chats:delete', id),
+  updateChatSystemPrompt: (id, prompt) => ipcRenderer.invoke('chats:updateSystemPrompt', id, prompt),
+  branchChat: (id, upto) => ipcRenderer.invoke('chats:branch', id, upto),
+  getDeletedChats: () => ipcRenderer.invoke('chats:getDeleted'),
+  restoreChat: (id) => ipcRenderer.invoke('chats:restore', id),
+  purgeChat: (id) => ipcRenderer.invoke('chats:purge', id),
+
+  // Message edit/branch + search
+  deleteMessage: (id) => ipcRenderer.invoke('messages:delete', id),
+  deleteMessagesFrom: (chatId, createdAt) =>
+    ipcRenderer.invoke('messages:deleteFrom', chatId, createdAt),
+  searchMessages: (query) => ipcRenderer.invoke('search:messages', query),
+
+  // Prompt templates
+  getTemplates: () => ipcRenderer.invoke('templates:getAll'),
+  saveTemplate: (name, body) => ipcRenderer.invoke('templates:save', name, body),
+  deleteTemplate: (id) => ipcRenderer.invoke('templates:delete', id),
 
   // Folders
   getFolders: () => ipcRenderer.invoke('folders:getAll'),

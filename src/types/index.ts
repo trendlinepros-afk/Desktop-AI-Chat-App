@@ -14,6 +14,27 @@ export interface Chat {
   modelVersion: string;
   createdAt: number;
   updatedAt: number;
+  systemPrompt: string;
+}
+
+export interface DeletedChat extends Chat {
+  deletedAt: number;
+}
+
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  body: string;
+  createdAt: number;
+}
+
+export interface MessageSearchHit {
+  chatId: string;
+  chatTitle: string;
+  messageId: string;
+  role: string;
+  snippet: string;
+  createdAt: number;
 }
 
 export interface ContentPart {
@@ -115,6 +136,11 @@ export interface WickedAPI {
   updateChatFolder(id: string, folderId: string | null): Promise<void>;
   updateChatModel(id: string, provider: Provider, modelVersion: string): Promise<void>;
   deleteChat(id: string): Promise<void>;
+  updateChatSystemPrompt(id: string, prompt: string): Promise<void>;
+  branchChat(id: string, uptoCreatedAt: number): Promise<Chat | null>;
+  getDeletedChats(): Promise<DeletedChat[]>;
+  restoreChat(id: string): Promise<void>;
+  purgeChat(id: string): Promise<void>;
 
   // Folders
   getFolders(): Promise<Folder[]>;
@@ -130,6 +156,14 @@ export interface WickedAPI {
     role: Message['role'];
     content: ContentPart[];
   }): Promise<Message>;
+  deleteMessage(id: string): Promise<void>;
+  deleteMessagesFrom(chatId: string, createdAt: number): Promise<void>;
+  searchMessages(query: string): Promise<MessageSearchHit[]>;
+
+  // Prompt templates
+  getTemplates(): Promise<PromptTemplate[]>;
+  saveTemplate(name: string, body: string): Promise<PromptTemplate>;
+  deleteTemplate(id: string): Promise<void>;
 
   // Chat links
   getChatLinks(chatId: string): Promise<string[]>;

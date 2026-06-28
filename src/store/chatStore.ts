@@ -14,7 +14,10 @@ interface ChatState {
   renameChat: (id: string, title: string) => Promise<void>;
   moveChat: (id: string, folderId: string | null) => Promise<void>;
   setChatModel: (id: string, provider: Provider, modelVersion: string) => Promise<void>;
+  setSystemPrompt: (id: string, prompt: string) => Promise<void>;
   deleteChat: (id: string) => Promise<void>;
+  removeMessage: (id: string) => Promise<void>;
+  reloadMessages: (chatId: string) => Promise<void>;
 
   setMessages: (messages: Message[]) => void;
   addMessage: (message: Message) => void;
@@ -73,6 +76,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  setSystemPrompt: async (id, prompt) => {
+    await window.polyglot.updateChatSystemPrompt(id, prompt);
+    set({ chats: get().chats.map((c) => (c.id === id ? { ...c, systemPrompt: prompt } : c)) });
+  },
+
   deleteChat: async (id) => {
     await window.polyglot.deleteChat(id);
     const remaining = get().chats.filter((c) => c.id !== id);
@@ -81,6 +89,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeChatId: get().activeChatId === id ? null : get().activeChatId,
       messages: get().activeChatId === id ? [] : get().messages,
     });
+  },
+
+  removeMessage: async (id) => {
+    await window.polyglot.deleteMessage(id);
+    set({ messages: get().messages.filter((m) => m.id !== id) });
+  },
+
+  reloadMessages: async (chatId) => {
+    const messages = await window.polyglot.getMessages(chatId);
+    if (get().activeChatId === chatId) set({ messages });
   },
 
   setMessages: (messages) => set({ messages }),

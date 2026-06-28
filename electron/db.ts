@@ -61,10 +61,40 @@ export function initDb(): void {
       value TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS prompt_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_chat ON messages(chat_id);
     CREATE INDEX IF NOT EXISTS idx_chats_folder ON chats(folder_id);
     CREATE INDEX IF NOT EXISTS idx_links_source ON chat_links(source_chat_id);
   `);
+
+  // Lightweight migrations.
+  if (!columnExists('chats', 'system_prompt')) {
+    db.exec("ALTER TABLE chats ADD COLUMN system_prompt TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists('chats', 'deleted_at')) {
+    db.exec('ALTER TABLE chats ADD COLUMN deleted_at INTEGER');
+  }
+
+  purgeExpiredChats();
+}
+
+const RECYCLE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+// Permanently remove chats that have been in the recycle bin longer than 30 days.
+export function purgeExpiredChats(): void {
+  const cutoff = Date.now() - RECYCLE_RETENTION_MS;
+  db.prepare('DELETE FROM chats WHERE deleted_at IS NOT NULL AND deleted_at < ?').run(cutoff);
+}
+
+function columnExists(table: string, column: string): boolean {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  return cols.some((c) => c.name === column);
 }
 
 // ---------- Folders ----------
@@ -113,6 +143,7 @@ interface ChatRow {
   model_version: string;
   created_at: number;
   updated_at: number;
+  system_prompt: string | null;
 }
 
 function mapChat(r: ChatRow): Chat {
@@ -124,12 +155,34 @@ function mapChat(r: ChatRow): Chat {
     modelVersion: r.model_version,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    systemPrompt: r.system_prompt ?? '',
   };
 }
 
 export function getChats(): Chat[] {
-  const rows = db.prepare('SELECT * FROM chats ORDER BY updated_at DESC').all() as ChatRow[];
+  const rows = db
+    .prepare('SELECT * FROM chats WHERE deleted_at IS NULL ORDER BY updated_at DESC')
+    .all() as ChatRow[];
   return rows.map(mapChat);
+}
+
+export interface DeletedChat extends Chat {
+  deletedAt: number;
+}
+
+export function getDeletedChats(): DeletedChat[] {
+  const rows = db
+    .prepare('SELECT * FROM chats WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC')
+    .all() as (ChatRow & { deleted_at: number })[];
+  return rows.map((r) => ({ ...mapChat(r), deletedAt: r.deleted_at }));
+}
+
+export function restoreChat(id: string): void {
+  db.prepare('UPDATE chats SET deleted_at = NULL, updated_at = ? WHERE id = ?').run(Date.now(), id);
+}
+
+export function purgeChat(id: string): void {
+  db.prepare('DELETE FROM chats WHERE id = ?').run(id);
 }
 
 export function createChat(data: {
@@ -147,10 +200,11 @@ export function createChat(data: {
     model_version: data.modelVersion,
     created_at: now,
     updated_at: now,
+    system_prompt: '',
   };
   db.prepare(
-    `INSERT INTO chats (id, title, folder_id, provider, model_version, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO chats (id, title, folder_id, provider, model_version, created_at, updated_at, system_prompt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     row.id,
     row.title,
@@ -158,7 +212,8 @@ export function createChat(data: {
     row.provider,
     row.model_version,
     row.created_at,
-    row.updated_at
+    row.updated_at,
+    row.system_prompt
   );
   return mapChat(row);
 }
@@ -184,12 +239,56 @@ export function updateChatModel(id: string, provider: Provider, modelVersion: st
   );
 }
 
+export function updateChatSystemPrompt(id: string, systemPrompt: string): void {
+  db.prepare('UPDATE chats SET system_prompt = ?, updated_at = ? WHERE id = ?').run(
+    systemPrompt,
+    Date.now(),
+    id
+  );
+}
+
 export function touchChat(id: string): void {
   db.prepare('UPDATE chats SET updated_at = ? WHERE id = ?').run(Date.now(), id);
 }
 
+// Soft-delete: move the chat to the recycle bin (auto-purged after 30 days).
 export function deleteChat(id: string): void {
-  db.prepare('DELETE FROM chats WHERE id = ?').run(id);
+  db.prepare('UPDATE chats SET deleted_at = ? WHERE id = ?').run(Date.now(), id);
+}
+
+// Fork a chat: new chat with the same model/folder/system prompt, copying all
+// messages with created_at <= uptoCreatedAt. Returns the new chat.
+export function branchChat(chatId: string, uptoCreatedAt: number): Chat | null {
+  const src = db.prepare('SELECT * FROM chats WHERE id = ?').get(chatId) as ChatRow | undefined;
+  if (!src) return null;
+  const now = Date.now();
+  const newId = randomUUID();
+  db.prepare(
+    `INSERT INTO chats (id, title, folder_id, provider, model_version, created_at, updated_at, system_prompt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    newId,
+    `${src.title} (branch)`,
+    src.folder_id,
+    src.provider,
+    src.model_version,
+    now,
+    now,
+    src.system_prompt ?? ''
+  );
+  const msgs = db
+    .prepare('SELECT * FROM messages WHERE chat_id = ? AND created_at <= ? ORDER BY created_at ASC')
+    .all(chatId, uptoCreatedAt) as MessageRow[];
+  const insert = db.prepare(
+    'INSERT INTO messages (id, chat_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+  );
+  let t = now;
+  const tx = db.transaction(() => {
+    for (const m of msgs) insert.run(randomUUID(), newId, m.role, m.content, t++);
+  });
+  tx();
+  const row = db.prepare('SELECT * FROM chats WHERE id = ?').get(newId) as ChatRow;
+  return mapChat(row);
 }
 
 // ---------- Messages ----------
@@ -237,6 +336,104 @@ export function saveMessage(msg: {
   ).run(row.id, row.chat_id, row.role, row.content, row.created_at);
   touchChat(msg.chatId);
   return mapMessage(row);
+}
+
+export function deleteMessage(id: string): void {
+  db.prepare('DELETE FROM messages WHERE id = ?').run(id);
+}
+
+// Delete a message and everything after it in the chat (used by regenerate/edit).
+export function deleteMessagesFrom(chatId: string, createdAt: number): void {
+  db.prepare('DELETE FROM messages WHERE chat_id = ? AND created_at >= ?').run(chatId, createdAt);
+}
+
+export interface MessageSearchHit {
+  chatId: string;
+  chatTitle: string;
+  messageId: string;
+  role: string;
+  snippet: string;
+  createdAt: number;
+}
+
+// Global full-text-ish search across all message bodies.
+export function searchMessages(query: string): MessageSearchHit[] {
+  const q = query.trim();
+  if (!q) return [];
+  const rows = db
+    .prepare(
+      `SELECT m.id as messageId, m.chat_id as chatId, m.role as role, m.content as content,
+              m.created_at as createdAt, c.title as chatTitle
+       FROM messages m JOIN chats c ON c.id = m.chat_id
+       WHERE m.content LIKE ? ESCAPE '\\'
+       ORDER BY m.created_at DESC LIMIT 50`
+    )
+    .all(`%${q.replace(/[\\%_]/g, '\\$&')}%`) as {
+    messageId: string;
+    chatId: string;
+    role: string;
+    content: string;
+    createdAt: number;
+    chatTitle: string;
+  }[];
+
+  const hits: MessageSearchHit[] = [];
+  for (const r of rows) {
+    let text = '';
+    try {
+      const parts = JSON.parse(r.content) as { type: string; text?: string }[];
+      text = parts
+        .filter((p) => p.type === 'text' && p.text)
+        .map((p) => p.text)
+        .join(' ');
+    } catch {
+      text = r.content;
+    }
+    const idx = text.toLowerCase().indexOf(q.toLowerCase());
+    if (idx === -1) continue;
+    const start = Math.max(0, idx - 40);
+    const snippet = (start > 0 ? '…' : '') + text.slice(start, idx + q.length + 60).trim();
+    hits.push({
+      chatId: r.chatId,
+      chatTitle: r.chatTitle,
+      messageId: r.messageId,
+      role: r.role,
+      snippet,
+      createdAt: r.createdAt,
+    });
+  }
+  return hits;
+}
+
+// ---------- Prompt templates ----------
+
+interface TemplateRow {
+  id: string;
+  name: string;
+  body: string;
+  created_at: number;
+}
+
+export function getTemplates(): { id: string; name: string; body: string; createdAt: number }[] {
+  const rows = db
+    .prepare('SELECT * FROM prompt_templates ORDER BY created_at ASC')
+    .all() as TemplateRow[];
+  return rows.map((r) => ({ id: r.id, name: r.name, body: r.body, createdAt: r.created_at }));
+}
+
+export function saveTemplate(name: string, body: string): { id: string; name: string; body: string; createdAt: number } {
+  const row: TemplateRow = { id: randomUUID(), name, body, created_at: Date.now() };
+  db.prepare('INSERT INTO prompt_templates (id, name, body, created_at) VALUES (?, ?, ?, ?)').run(
+    row.id,
+    row.name,
+    row.body,
+    row.created_at
+  );
+  return { id: row.id, name: row.name, body: row.body, createdAt: row.created_at };
+}
+
+export function deleteTemplate(id: string): void {
+  db.prepare('DELETE FROM prompt_templates WHERE id = ?').run(id);
 }
 
 // ---------- Chat links ----------

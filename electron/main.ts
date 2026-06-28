@@ -103,6 +103,25 @@ function registerIpc(): void {
     db.updateChatModel(id, provider, modelVersion)
   );
   ipcMain.handle('chats:delete', (_e, id: string) => db.deleteChat(id));
+  ipcMain.handle('chats:updateSystemPrompt', (_e, id: string, prompt: string) =>
+    db.updateChatSystemPrompt(id, prompt)
+  );
+  ipcMain.handle('chats:branch', (_e, id: string, upto: number) => db.branchChat(id, upto));
+  ipcMain.handle('chats:getDeleted', () => db.getDeletedChats());
+  ipcMain.handle('chats:restore', (_e, id: string) => db.restoreChat(id));
+  ipcMain.handle('chats:purge', (_e, id: string) => db.purgeChat(id));
+
+  // Message edit/branch + global search
+  ipcMain.handle('messages:delete', (_e, id: string) => db.deleteMessage(id));
+  ipcMain.handle('messages:deleteFrom', (_e, chatId: string, createdAt: number) =>
+    db.deleteMessagesFrom(chatId, createdAt)
+  );
+  ipcMain.handle('search:messages', (_e, query: string) => db.searchMessages(query));
+
+  // Prompt templates
+  ipcMain.handle('templates:getAll', () => db.getTemplates());
+  ipcMain.handle('templates:save', (_e, name: string, body: string) => db.saveTemplate(name, body));
+  ipcMain.handle('templates:delete', (_e, id: string) => db.deleteTemplate(id));
 
   // ----- Folders -----
   ipcMain.handle('folders:getAll', () => db.getFolders());
