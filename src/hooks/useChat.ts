@@ -216,18 +216,40 @@ export async function generateImage(
   modelVersion: string,
   prompt: string
 ): Promise<string> {
-  const genAI = new GoogleGenerativeAI(apiKey);
-  // The Imagen models are accessed via a generative model handle.
-  const model = genAI.getGenerativeModel({ model: modelVersion });
-  // @ts-expect-error generateImages exists on Imagen-capable models in the SDK runtime.
-  const result = await model.generateImages({
-    prompt,
-    numberOfImages: 1,
-    aspectRatio: '1:1',
-  });
-  const base64 = result?.generatedImages?.[0]?.image?.imageBytes;
-  if (!base64) throw new Error('No image returned from Imagen');
-  return `data:image/png;base64,${base64}`;
+  // Imagen on the Gemini API is the REST `:predict` endpoint — the JS SDK has
+  // no image-generation method, so call it directly.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelVersion}:predict`;
+  const res = await withRetry(() =>
+    fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        instances: [{ prompt }],
+        parameters: { sampleCount: 1, aspectRatio: '1:1' },
+      }),
+    })
+  );
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const err = (await res.json()) as { error?: { message?: string } };
+      detail = err?.error?.message || '';
+    } catch {
+      detail = await res.text().catch(() => '');
+    }
+    if (res.status === 400 || res.status === 403) {
+      throw new Error(
+        `Imagen request rejected (${res.status}). Image generation on the Gemini API requires a paid/billing-enabled key. ${detail}`.trim()
+      );
+    }
+    throw new Error(`Imagen error ${res.status}: ${detail.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as {
+    predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
+  };
+  const pred = data.predictions?.[0];
+  if (!pred?.bytesBase64Encoded) throw new Error('No image returned from Imagen');
+  return `data:${pred.mimeType || 'image/png'};base64,${pred.bytesBase64Encoded}`;
 }
 
 function keyFor(provider: Provider, settings: Settings): string {
