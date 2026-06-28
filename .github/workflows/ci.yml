@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Fast feedback on every push / PR: typecheck + production build.
+  verify:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        # Electron's binary isn't needed to typecheck/bundle.
+        run: ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci
+      - name: Typecheck + build
+        run: npm run build
+
+  # Build and publish the Windows installer — on a version tag (vX.Y.Z) or when
+  # run manually from the Actions tab ("Run workflow"). electron-builder publishes
+  # a GitHub Release named v<package.json version> with the installer + latest.yml.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build renderer + main
+        run: npm run build
+      - name: Build & publish Windows installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish always
