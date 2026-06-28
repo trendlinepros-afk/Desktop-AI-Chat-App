@@ -21,8 +21,10 @@ export function UsageMeter({ chat }: { chat: Chat }) {
       ~{formatTokens(usage.tokens)} tok{' '}
       {usage.local ? (
         <span className="text-idea">· local</span>
-      ) : (
+      ) : usage.priced ? (
         <>· est. {formatCost(usage.cost)}</>
+      ) : (
+        <>· est. n/a</>
       )}
     </span>
   );

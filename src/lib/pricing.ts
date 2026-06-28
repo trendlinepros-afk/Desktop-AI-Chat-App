@@ -22,17 +22,22 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+const TOKENS_PER_IMAGE = 85; // rough flat cost for a vision image part
+
 function messageTokens(m: Message): number {
-  const text = m.content
-    .map((p) => (p.type === 'text' ? p.text ?? '' : p.type === 'image_url' ? '[image]'.repeat(150) : ''))
-    .join(' ');
-  return estimateTokens(text);
+  let tokens = 0;
+  for (const p of m.content) {
+    if (p.type === 'image_url') tokens += TOKENS_PER_IMAGE;
+    else if (p.text) tokens += estimateTokens(p.text);
+  }
+  return tokens;
 }
 
 export interface UsageEstimate {
   tokens: number;
-  cost: number; // USD, 0 for local/unknown
-  local: boolean;
+  cost: number; // USD (0 for local)
+  local: boolean; // true for Ollama
+  priced: boolean; // false when we have no price for this model
 }
 
 // Estimate cumulative usage for a chat's messages under a given model.
@@ -48,11 +53,11 @@ export function estimateUsage(
     else inTokens += messageTokens(m);
   }
   const tokens = inTokens + outTokens;
-  if (provider === 'ollama') return { tokens, cost: 0, local: true };
+  if (provider === 'ollama') return { tokens, cost: 0, local: true, priced: true };
   const price = PRICES[modelVersion];
-  if (!price) return { tokens, cost: 0, local: false };
+  if (!price) return { tokens, cost: 0, local: false, priced: false };
   const cost = (inTokens / 1_000_000) * price.in + (outTokens / 1_000_000) * price.out;
-  return { tokens, cost, local: false };
+  return { tokens, cost, local: false, priced: true };
 }
 
 export function formatCost(cost: number): string {

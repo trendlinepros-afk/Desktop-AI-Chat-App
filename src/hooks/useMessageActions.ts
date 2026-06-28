@@ -5,12 +5,13 @@ import { useUIStore } from '../store/uiStore';
 import { useSend } from './useSend';
 
 export function useMessageActions(chat: Chat) {
-  const { regenerate } = useSend();
+  // Single useSend instance — useSend()/useChat() now share one streaming
+  // controller via the stream store, but we still avoid double-instantiation.
+  const { send, regenerate } = useSend();
   const removeMessage = useChatStore((s) => s.removeMessage);
   const reloadMessages = useChatStore((s) => s.reloadMessages);
   const loadChats = useChatStore((s) => s.loadChats);
   const selectChat = useChatStore((s) => s.selectChat);
-  const { send } = useSend();
   const toast = useUIStore((s) => s.toast);
 
   // Delete a single message.

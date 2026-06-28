@@ -6,6 +6,7 @@ import type { Content } from '@google/generative-ai';
 import type { ContentPart, Message, Provider, Settings } from '../types';
 import { ollamaOpenAIBase } from '../lib/ollama';
 import { withRetry } from '../lib/retry';
+import { useStreamStore, beginStream, endStream, abortCurrentStream } from '../store/streamStore';
 
 export interface SendOptions {
   provider: Provider;
@@ -244,13 +245,13 @@ function keyFor(provider: Provider, settings: Settings): string {
 }
 
 export function useChat() {
-  const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  // Streaming state + abort live in a shared store so the input box and
+  // per-message regenerate/edit all reflect the same in-flight request.
+  const isStreaming = useStreamStore((s) => s.isStreaming);
 
   const stop = useCallback(() => {
-    abortRef.current?.abort();
-    setIsStreaming(false);
+    abortCurrentStream();
   }, []);
 
   const sendMessage = useCallback(async (opts: SendOptions): Promise<string> => {
@@ -259,20 +260,14 @@ export function useChat() {
       throw new Error(`No API key set for ${opts.provider}. Add one in Settings.`);
     }
     setError(null);
-    setIsStreaming(true);
-    const controller = new AbortController();
-    abortRef.current = controller;
+    const controller = beginStream();
     const withSignal = { ...opts, signal: controller.signal };
     try {
       switch (opts.provider) {
         case 'openai':
           return await streamOpenAICompatible(apiKey, undefined, withSignal);
         case 'deepseek':
-          return await streamOpenAICompatible(
-            apiKey,
-            'https://api.deepseek.com',
-            withSignal
-          );
+          return await streamOpenAICompatible(apiKey, 'https://api.deepseek.com', withSignal);
         case 'ollama':
           return await streamOpenAICompatible(
             apiKey,
@@ -287,8 +282,7 @@ export function useChat() {
       setError(message);
       throw err;
     } finally {
-      setIsStreaming(false);
-      abortRef.current = null;
+      endStream(controller);
     }
   }, []);
 

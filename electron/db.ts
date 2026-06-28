@@ -349,12 +349,19 @@ export function saveMessage(msg: {
   role: Message['role'];
   content: Message['content'];
 }): Message {
+  // Guarantee strictly-increasing timestamps within a chat so range deletes
+  // (regenerate / edit-and-resend) can't accidentally catch a sibling saved in
+  // the same millisecond.
+  const maxRow = db
+    .prepare('SELECT MAX(created_at) AS m FROM messages WHERE chat_id = ?')
+    .get(msg.chatId) as { m: number | null };
+  const createdAt = Math.max(Date.now(), (maxRow?.m ?? 0) + 1);
   const row: MessageRow = {
     id: msg.id ?? randomUUID(),
     chat_id: msg.chatId,
     role: msg.role,
     content: JSON.stringify(msg.content),
-    created_at: Date.now(),
+    created_at: createdAt,
   };
   db.prepare(
     'INSERT INTO messages (id, chat_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'

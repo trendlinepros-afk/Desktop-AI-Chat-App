@@ -68,7 +68,9 @@ export function ModelSelector({ chat }: { chat: Chat }) {
   const onProvider = (provider: Provider) => {
     const version = defaultVersionFor(provider);
     setChatModel(chat.id, provider, version);
-    if (provider !== 'gemini') setImageGen(chat.id, false);
+    // Always reset image-gen on a provider switch — defaultVersionFor returns a
+    // text model, so leaving imageGen on would mismatch the selected model.
+    setImageGen(chat.id, false);
   };
 
   const baseVersions =

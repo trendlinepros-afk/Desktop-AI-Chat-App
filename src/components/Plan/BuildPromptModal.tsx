@@ -93,9 +93,13 @@ export function BuildPromptModal({ chat, onClose }: { chat: Chat; onClose: () =>
             Close
           </button>
           <button
-            onClick={() => {
-              navigator.clipboard.writeText(prompt);
-              toast('Build prompt copied', 'success');
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(prompt);
+                toast('Build prompt copied', 'success');
+              } catch {
+                toast('Copy failed — select the text and copy manually', 'error');
+              }
             }}
             disabled={loading || !!error}
             className="rounded-lg border border-edge px-4 py-2 text-sm hover:bg-hover disabled:opacity-40"
