@@ -158,6 +158,7 @@ export interface Settings {
   rpMemoryEnabled: boolean; // periodically summarize RP chats into memory files
   rpSummarizeEvery: number; // summarize after this many new messages
   rpVaultPath: string; // a SEPARATE Obsidian vault folder used only for RP memory
+  rpAutoReplyLimit: number; // max AI replies in a row before pausing for you (caps API use)
 }
 
 export const VAULT_CATEGORIES = [
@@ -302,6 +303,8 @@ export interface WickedAPI {
     senderPersonaId: string | null;
     content: string;
   }): Promise<RPMessage>;
+  rpUpdateSceneMessage(id: string, content: string): Promise<void>;
+  rpDeleteSceneMessage(id: string): Promise<void>;
   rpClearScene(sceneId: string): Promise<void>;
 
   // RP memory — markdown files in a folder kept separate from the Brain vault
@@ -310,6 +313,7 @@ export interface WickedAPI {
   rpClearMemory(sceneId: string): Promise<void>;
   rpOpenMemoryFolder(): Promise<void>;
   rpSyncProfiles(): Promise<void>;
+  rpSyncFromVault(sceneId: string): Promise<{ updated: number; memoryChars: number }>;
 
   // Grok (xAI) completion — run in the main process to avoid renderer CORS.
   rpGrokComplete(

@@ -15,6 +15,7 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
   const [rpMemoryEnabled, setRpMemoryEnabled] = useState(settings.rpMemoryEnabled);
   const [rpSummarizeEvery, setRpSummarizeEvery] = useState(settings.rpSummarizeEvery);
   const [rpVaultPath, setRpVaultPath] = useState(settings.rpVaultPath);
+  const [rpAutoReplyLimit, setRpAutoReplyLimit] = useState(settings.rpAutoReplyLimit);
   const [showKey, setShowKey] = useState(false);
   const [models, setModels] = useState<string[]>(GROK_MODELS);
 
@@ -38,7 +39,14 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
   };
 
   const onSave = async () => {
-    await save({ grokApiKey, grokModel, rpMemoryEnabled, rpSummarizeEvery, rpVaultPath });
+    await save({
+      grokApiKey,
+      grokModel,
+      rpMemoryEnabled,
+      rpSummarizeEvery,
+      rpVaultPath,
+      rpAutoReplyLimit,
+    });
     toast('RP settings saved', 'success');
     onClose();
   };
@@ -107,6 +115,32 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
                 Refresh
               </button>
             </div>
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Group conversations</h3>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-text-muted">
+                Let characters talk among themselves up to
+              </span>
+              <select
+                value={rpAutoReplyLimit}
+                onChange={(e) => setRpAutoReplyLimit(Number(e.target.value))}
+                className="rounded-lg border border-edge bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
+              >
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={n}>
+                    {n} {n === 1 ? 'reply' : 'replies'}
+                  </option>
+                ))}
+              </select>
+              <span className="text-sm text-text-muted">in a row</span>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              After you speak, the characters reply back and forth to build the story, then pause
+              for you. They also stop early if one of them asks <strong>you</strong> a direct
+              question. Lower this to use fewer API credits.
+            </p>
           </div>
 
           <div>

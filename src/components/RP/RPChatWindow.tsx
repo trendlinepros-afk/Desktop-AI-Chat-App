@@ -2,9 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { useRPStore } from '../../store/rpStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
+import { AddPersonModal } from './AddPersonModal';
 import type { RPMessage, RPPersona } from '../../types';
 
-export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) => void }) {
+export function RPChatWindow({
+  onEditScene,
+  onCreatePersona,
+}: {
+  onEditScene: (sceneId: string) => void;
+  onCreatePersona: () => void;
+}) {
   const scenes = useRPStore((s) => s.scenes);
   const activeSceneId = useRPStore((s) => s.activeSceneId);
   const memberIds = useRPStore((s) => s.memberIds);
@@ -18,11 +25,19 @@ export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) =
   const stop = useRPStore((s) => s.stop);
   const summarizeNow = useRPStore((s) => s.summarizeNow);
   const clearScene = useRPStore((s) => s.clearScene);
+  const renameScene = useRPStore((s) => s.renameScene);
+  const syncFromVault = useRPStore((s) => s.syncFromVault);
+  const editMessage = useRPStore((s) => s.editMessage);
+  const deleteMessage = useRPStore((s) => s.deleteMessage);
+  const regenerateLast = useRPStore((s) => s.regenerateLast);
   const grokKey = useSettingsStore((s) => s.settings.grokApiKey);
   const rpVaultPath = useSettingsStore((s) => s.settings.rpVaultPath);
   const toast = useUIStore((s) => s.toast);
 
   const [input, setInput] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scene = scenes.find((s) => s.id === activeSceneId) ?? null;
@@ -75,6 +90,12 @@ export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) =
     void sendUser(text);
   };
 
+  const saveTitle = () => {
+    const next = titleDraft.trim();
+    if (next && next !== scene.name) void renameScene(scene.id, next);
+    setTitleEditing(false);
+  };
+
   const isMine = (m: RPMessage) =>
     m.senderPersonaId === null || (!!me && m.senderPersonaId === me.id);
 
@@ -83,18 +104,56 @@ export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) =
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-edge bg-chat px-4 py-2">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-medium">{scene.name}</h2>
+          {titleEditing ? (
+            <input
+              autoFocus
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={saveTitle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveTitle();
+                if (e.key === 'Escape') setTitleEditing(false);
+              }}
+              className="w-full rounded-md border border-edge bg-surface px-2 py-0.5 text-sm outline-none focus:border-accent"
+            />
+          ) : (
+            <button
+              onClick={() => {
+                setTitleDraft(scene.name);
+                setTitleEditing(true);
+              }}
+              title="Rename this conversation"
+              className="group flex max-w-full items-center gap-1 text-sm font-medium hover:text-accent"
+            >
+              <span className="truncate">{scene.name}</span>
+              <span className="text-xs opacity-0 transition group-hover:opacity-60">✏️</span>
+            </button>
+          )}
           <p className="truncate text-xs text-text-muted">
             {members.length > 0 ? members.map((p) => `${p.avatar} ${p.name}`).join(' · ') : 'No one yet'}
           </p>
         </div>
         {summarizing && <span className="text-xs text-brain">💭 saving memory…</span>}
         <button
+          onClick={() => syncFromVault()}
+          title="Pull the latest persona info + memory from the Obsidian vault into this conversation"
+          className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
+        >
+          🔄 Sync
+        </button>
+        <button
           onClick={() => onEditScene(scene.id)}
           title="Add or remove characters"
           className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
         >
           👥 Cast
+        </button>
+        <button
+          onClick={() => setAddOpen(true)}
+          title="Add another person to the conversation"
+          className="rounded-md border border-accent/40 px-2 py-1 text-sm text-accent hover:bg-accent/10"
+        >
+          ＋ Add person
         </button>
         <button
           onClick={() => summarizeNow(scene.id)}
@@ -130,24 +189,33 @@ export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) =
             Say something to begin the scene.
           </p>
         )}
-        {messages.map((m) => {
+        {messages.map((m, i) => {
           const sender = byId(m.senderPersonaId);
+          const mine = isMine(m);
+          const isLast = i === messages.length - 1;
           return (
-            <Bubble
+            <MessageRow
               key={m.id}
-              mine={isMine(m)}
+              text={m.content}
+              mine={mine}
               avatar={sender?.avatar ?? '🧑'}
               name={sender?.name ?? 'You'}
-              text={m.content}
+              canRegen={isLast && !mine && !generating}
+              onEdit={(text) => editMessage(m.id, text)}
+              onDelete={() => {
+                if (confirm('Delete this message?')) void deleteMessage(m.id);
+              }}
+              onRegen={() => regenerateLast()}
             />
           );
         })}
         {generating && speakingId && (
-          <Bubble
+          <MessageRow
+            text="…"
             mine={false}
             avatar={byId(speakingId)?.avatar ?? '🎭'}
             name={byId(speakingId)?.name ?? ''}
-            text="…"
+            readOnly
           />
         )}
       </div>
@@ -202,33 +270,108 @@ export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) =
           )}
         </div>
       </div>
+
+      {addOpen && (
+        <AddPersonModal onClose={() => setAddOpen(false)} onCreateNew={onCreatePersona} />
+      )}
     </div>
   );
 }
 
-function Bubble({
+function MessageRow({
+  text,
   mine,
   avatar,
   name,
-  text,
+  canRegen,
+  readOnly,
+  onEdit,
+  onDelete,
+  onRegen,
 }: {
+  text: string;
   mine: boolean;
   avatar: string;
   name: string;
-  text: string;
+  canRegen?: boolean;
+  readOnly?: boolean;
+  onEdit?: (text: string) => void;
+  onDelete?: () => void;
+  onRegen?: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+
+  const startEdit = () => {
+    setDraft(text);
+    setEditing(true);
+  };
+  const save = () => {
+    onEdit?.(draft);
+    setEditing(false);
+  };
+
   return (
-    <div className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+    <div className={`group flex gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
       {!mine && <span className="mt-1 text-lg leading-none">{avatar}</span>}
       <div className="max-w-[75%]">
         {!mine && <div className="mb-0.5 text-xs text-text-muted">{name}</div>}
-        <div
-          className={`whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${
-            mine ? 'bg-user text-white' : 'bg-surface text-text-primary'
-          }`}
-        >
-          {text}
-        </div>
+        {editing ? (
+          <div className="rounded-2xl border border-accent bg-surface p-2">
+            <textarea
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={Math.min(10, Math.max(2, draft.split('\n').length))}
+              className="w-full resize-y rounded-lg bg-transparent px-1 text-sm outline-none"
+            />
+            <div className="mt-1 flex justify-end gap-2">
+              <button
+                onClick={() => setEditing(false)}
+                className="rounded-md px-2 py-0.5 text-xs text-text-muted hover:text-text-primary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={save}
+                className="rounded-md bg-accent px-2 py-0.5 text-xs text-white hover:bg-accent/90"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className={`whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${
+              mine ? 'bg-user text-white' : 'bg-surface text-text-primary'
+            }`}
+          >
+            {text}
+          </div>
+        )}
+        {!readOnly && !editing && (
+          <div
+            className={`mt-0.5 flex gap-2 text-[11px] text-text-muted opacity-0 transition group-hover:opacity-100 ${
+              mine ? 'justify-end' : 'justify-start'
+            }`}
+          >
+            {onEdit && (
+              <button onClick={startEdit} className="hover:text-text-primary" title="Edit / tweak">
+                ✏️ Edit
+              </button>
+            )}
+            {canRegen && onRegen && (
+              <button onClick={onRegen} className="hover:text-text-primary" title="Regenerate">
+                🔄 Redo
+              </button>
+            )}
+            {onDelete && (
+              <button onClick={onDelete} className="hover:text-red-400" title="Delete">
+                🗑
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

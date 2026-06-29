@@ -104,6 +104,9 @@ const api: WickedAPI = {
     ipcRenderer.invoke('rp:setSceneSummarized', sceneId, count),
   rpGetSceneMessages: (sceneId) => ipcRenderer.invoke('rp:getSceneMessages', sceneId),
   rpSaveSceneMessage: (msg) => ipcRenderer.invoke('rp:saveSceneMessage', msg),
+  rpUpdateSceneMessage: (id, content) =>
+    ipcRenderer.invoke('rp:updateSceneMessage', id, content),
+  rpDeleteSceneMessage: (id) => ipcRenderer.invoke('rp:deleteSceneMessage', id),
   rpClearScene: (sceneId) => ipcRenderer.invoke('rp:clearScene', sceneId),
   rpReadMemory: (sceneId) => ipcRenderer.invoke('rp:readMemory', sceneId),
   rpAppendMemory: (sceneId, sceneName, summary) =>
@@ -111,6 +114,7 @@ const api: WickedAPI = {
   rpClearMemory: (sceneId) => ipcRenderer.invoke('rp:clearMemory', sceneId),
   rpOpenMemoryFolder: () => ipcRenderer.invoke('rp:openMemoryFolder'),
   rpSyncProfiles: () => ipcRenderer.invoke('rp:syncProfiles'),
+  rpSyncFromVault: (sceneId) => ipcRenderer.invoke('rp:syncFromVault', sceneId),
   rpGrokComplete: (apiKey, model, messages) =>
     ipcRenderer.invoke('rp:grokComplete', apiKey, model, messages),
 
