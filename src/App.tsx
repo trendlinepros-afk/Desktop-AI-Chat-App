@@ -4,6 +4,7 @@ import { ChatWindow } from './components/Chat/ChatWindow';
 import { UpdateChecker } from './components/UpdateChecker';
 import { BrainPanel } from './components/Brain/BrainPanel';
 import { SettingsModal } from './components/Settings/SettingsModal';
+import { RPApp } from './components/RP/RPApp';
 import { OnboardingModal } from './components/Onboarding/OnboardingModal';
 import { Toaster } from './components/Toaster';
 import { useSettingsStore } from './store/settingsStore';
@@ -23,6 +24,7 @@ export default function App() {
   const toggleBrainPanel = useBrainStore((s) => s.togglePanel);
   const panelOpen = useBrainStore((s) => s.panelOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+  const rpOpen = useUIStore((s) => s.rpOpen);
   const initTheme = useThemeStore((s) => s.init);
   const initOnboarding = useOnboardingStore((s) => s.init);
 
@@ -62,6 +64,7 @@ export default function App() {
       </main>
       {panelOpen && <BrainPanel />}
       <SettingsModal />
+      {rpOpen && <RPApp />}
       <OnboardingModal />
       <Toaster />
     </div>

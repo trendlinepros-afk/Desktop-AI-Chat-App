@@ -1,0 +1,208 @@
+import { useEffect, useState } from 'react';
+import { useSettingsStore } from '../../store/settingsStore';
+import { useUIStore } from '../../store/uiStore';
+import { GROK_MODELS, GROK_BASE_URL, listGrokModels } from '../../lib/rpChat';
+
+// Settings for the Role-Play side only — deliberately separate from the main
+// app's Settings dialog.
+export function RPSettingsModal({ onClose }: { onClose: () => void }) {
+  const settings = useSettingsStore((s) => s.settings);
+  const save = useSettingsStore((s) => s.save);
+  const toast = useUIStore((s) => s.toast);
+
+  const [grokApiKey, setGrokApiKey] = useState(settings.grokApiKey);
+  const [grokModel, setGrokModel] = useState(settings.grokModel);
+  const [rpMemoryEnabled, setRpMemoryEnabled] = useState(settings.rpMemoryEnabled);
+  const [rpSummarizeEvery, setRpSummarizeEvery] = useState(settings.rpSummarizeEvery);
+  const [rpVaultPath, setRpVaultPath] = useState(settings.rpVaultPath);
+  const [showKey, setShowKey] = useState(false);
+  const [models, setModels] = useState<string[]>(GROK_MODELS);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const refreshModels = async () => {
+    const list = await listGrokModels(grokApiKey);
+    setModels(list);
+    toast(`Found ${list.length} Grok model(s)`, 'success');
+  };
+
+  const pickVault = async () => {
+    const path = await window.polyglot.openVaultFolderDialog();
+    if (path) setRpVaultPath(path);
+  };
+
+  const onSave = async () => {
+    await save({ grokApiKey, grokModel, rpMemoryEnabled, rpSummarizeEvery, rpVaultPath });
+    toast('RP settings saved', 'success');
+    onClose();
+  };
+
+  const modelOptions = Array.from(new Set([grokModel, ...models]));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-edge bg-topbar shadow-2xl">
+        <div className="flex items-center justify-between border-b border-edge px-5 py-3">
+          <h2 className="font-semibold">⚙️ RP Settings</h2>
+          <button onClick={onClose} className="text-text-muted hover:text-text-primary">
+            ✕
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-4">
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Grok (xAI) API key</h3>
+            <div className="flex items-center rounded-lg border border-edge bg-surface focus-within:border-accent">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={grokApiKey}
+                onChange={(e) => setGrokApiKey(e.target.value)}
+                placeholder="xai-…"
+                className="flex-1 bg-transparent px-3 py-2 text-sm outline-none"
+              />
+              <button
+                onClick={() => setShowKey((v) => !v)}
+                className="px-3 text-text-muted hover:text-text-primary"
+              >
+                {showKey ? '🙈' : '👁'}
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              The RP side uses the Grok API ({GROK_BASE_URL}) — separate from the models used by the
+              main app. Get a key from{' '}
+              <button
+                className="text-accent underline"
+                onClick={() => window.polyglot.openExternal('https://console.x.ai')}
+              >
+                console.x.ai
+              </button>
+              . Stored encrypted at rest.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Default model for new personas</h3>
+            <div className="flex gap-2">
+              <input
+                list="rp-settings-models"
+                value={grokModel}
+                onChange={(e) => setGrokModel(e.target.value)}
+                className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+              <datalist id="rp-settings-models">
+                {modelOptions.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+              <button
+                onClick={refreshModels}
+                className="rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Memory vault (Obsidian)</h3>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={rpVaultPath || 'No RP vault chosen — using app storage'}
+                className="flex-1 truncate rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-text-muted"
+              />
+              <button
+                onClick={pickVault}
+                className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent/90"
+              >
+                {rpVaultPath ? 'Change…' : 'Choose vault folder'}
+              </button>
+              {rpVaultPath && (
+                <button
+                  onClick={() => setRpVaultPath('')}
+                  title="Stop using the Obsidian vault for RP memory"
+                  className="shrink-0 rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              Pick a <strong>separate Obsidian vault</strong> (create a brand-new one in Obsidian
+              first, then select its folder here). RP memory is written as markdown into a{' '}
+              <code>WickedRP/</code> folder inside it, kept entirely apart from WICKED's main Brain
+              vault. New to Obsidian? Get it at{' '}
+              <button
+                className="text-accent underline"
+                onClick={() => window.polyglot.openExternal('https://obsidian.md')}
+              >
+                obsidian.md
+              </button>
+              .
+            </p>
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Memory</h3>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={rpMemoryEnabled}
+                onChange={(e) => setRpMemoryEnabled(e.target.checked)}
+                className="accent-brain"
+              />
+              Automatically summarize long conversations into each persona's memory
+            </label>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-sm text-text-muted">Summarize every</span>
+              <select
+                value={rpSummarizeEvery}
+                onChange={(e) => setRpSummarizeEvery(Number(e.target.value))}
+                disabled={!rpMemoryEnabled}
+                className="rounded-lg border border-edge bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent disabled:opacity-50"
+              >
+                {[10, 20, 30, 50].map((n) => (
+                  <option key={n} value={n}>
+                    {n} messages
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              RP memory is stored as markdown files in a folder kept{' '}
+              <strong>completely separate</strong> from WICKED's Brain vault. Older turns get folded
+              into memory so the persona keeps context without the prompt growing forever.
+            </p>
+            <button
+              onClick={() => window.polyglot.rpOpenMemoryFolder()}
+              className="mt-2 rounded-lg border border-edge px-3 py-1.5 text-sm text-text-muted hover:text-text-primary"
+            >
+              📂 Open RP memory folder
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-edge px-5 py-3">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-edge px-4 py-2 text-sm text-text-muted hover:text-text-primary"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSave}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

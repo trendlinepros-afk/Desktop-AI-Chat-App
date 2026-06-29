@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const { autoUpdater } = electronUpdater;
 import * as db from './db';
 import * as vault from './vault';
+import * as rpMemory from './rpMemory';
 import * as mcp from './mcp';
 import type { McpServerConfig } from './mcp';
 import type { Provider, Settings } from '../src/types';
@@ -322,6 +323,27 @@ function registerIpc(): void {
     const data = (await res.json()) as { data?: { id?: string }[] };
     return (data.data ?? []).map((m) => m.id).filter((id): id is string => !!id);
   });
+
+  // ----- Role-Play (RP) -----
+  ipcMain.handle('rp:getPersonas', () => db.rpGetPersonas());
+  ipcMain.handle('rp:createPersona', (_e, data) => db.rpCreatePersona(data));
+  ipcMain.handle('rp:updatePersona', (_e, id: string, patch) => db.rpUpdatePersona(id, patch));
+  ipcMain.handle('rp:deletePersona', (_e, id: string) => {
+    db.rpDeletePersona(id);
+    rpMemory.clearMemory(id);
+  });
+  ipcMain.handle('rp:getMessages', (_e, personaId: string) => db.rpGetMessages(personaId));
+  ipcMain.handle('rp:saveMessage', (_e, msg) => db.rpSaveMessage(msg));
+  ipcMain.handle('rp:clearMessages', (_e, personaId: string) => db.rpClearMessages(personaId));
+  ipcMain.handle('rp:setSummarized', (_e, personaId: string, count: number) =>
+    db.rpSetSummarized(personaId, count)
+  );
+  ipcMain.handle('rp:readMemory', (_e, personaId: string) => rpMemory.readMemory(personaId));
+  ipcMain.handle('rp:appendMemory', (_e, personaId: string, personaName: string, summary: string) =>
+    rpMemory.appendMemory(personaId, personaName, summary)
+  );
+  ipcMain.handle('rp:clearMemory', (_e, personaId: string) => rpMemory.clearMemory(personaId));
+  ipcMain.handle('rp:openMemoryFolder', () => rpMemory.openMemoryFolder());
 
   // ----- Shell -----
   ipcMain.handle('shell:openExternal', (_e, p: string) => {

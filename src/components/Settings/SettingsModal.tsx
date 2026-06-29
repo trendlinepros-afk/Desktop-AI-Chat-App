@@ -11,6 +11,7 @@ import { listOllamaModels } from '../../lib/ollama';
 export function SettingsModal() {
   const open = useUIStore((s) => s.settingsOpen);
   const setOpen = useUIStore((s) => s.setSettingsOpen);
+  const setRpOpen = useUIStore((s) => s.setRpOpen);
   const toast = useUIStore((s) => s.toast);
   const settings = useSettingsStore((s) => s.settings);
   const save = useSettingsStore((s) => s.save);
@@ -247,6 +248,25 @@ export function SettingsModal() {
             >
               ▶ Replay welcome tour
             </button>
+          </Section>
+
+          {/* Role-Play (RP) — a separate side of the app, launched from here */}
+          <Section title="Role-Play (RP)">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-text-muted">
+                A separate role-playing chatbot: build personas of people you can talk to, powered
+                by the Grok API, with its own memory kept apart from the main app.
+              </p>
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  setRpOpen(true);
+                }}
+                className="shrink-0 rounded-lg border border-accent bg-accent/10 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/20"
+              >
+                🎭 RP
+              </button>
+            </div>
           </Section>
         </div>
 
