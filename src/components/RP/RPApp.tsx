@@ -25,11 +25,15 @@ export function RPApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    loadPersonas();
-    loadScenes();
-    // Mirror existing personas into the vault (if one is configured) so the
-    // roster shows up in Obsidian without needing an edit first.
-    window.polyglot.rpSyncProfiles?.();
+    (async () => {
+      // Rotate any "auto-change daily" avatars that are due, then load.
+      await window.polyglot.rpRotateDueAvatars?.();
+      await loadPersonas();
+      await loadScenes();
+      // Mirror existing personas into the vault (if configured) so the roster
+      // shows up in Obsidian without needing an edit first.
+      window.polyglot.rpSyncProfiles?.();
+    })();
   }, [loadPersonas, loadScenes]);
 
   const anyModalOpen = personaEditor.open || sceneEditor.open || settingsOpen;

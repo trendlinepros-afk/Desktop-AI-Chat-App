@@ -13,14 +13,21 @@ export interface RPTurn {
   content: string;
 }
 
+export interface GrokOptions {
+  temperature?: number;
+  presencePenalty?: number;
+  frequencyPenalty?: number;
+}
+
 // One Grok completion (non-streaming). Used for both persona replies and the
 // memory summaries.
 export async function grokComplete(
   apiKey: string,
   model: string,
-  messages: RPTurn[]
+  messages: RPTurn[],
+  options?: GrokOptions
 ): Promise<string> {
-  return window.polyglot.rpGrokComplete(apiKey, model, messages);
+  return window.polyglot.rpGrokComplete(apiKey, model, messages, options);
 }
 
 // List the chat models the Grok key can actually call (via the main process to

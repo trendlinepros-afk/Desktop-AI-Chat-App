@@ -9,6 +9,7 @@ import type {
   Provider,
   RPMessage,
   RPPersona,
+  RPPersonaImage,
   RPScene,
   Settings,
 } from '../src/types';
@@ -124,10 +125,22 @@ export function initDb(): void {
       greeting TEXT NOT NULL DEFAULT '',
       model TEXT NOT NULL,
       is_me INTEGER NOT NULL DEFAULT 0,
+      avatar_image TEXT NOT NULL DEFAULT '',
+      avatar_rotate_daily INTEGER NOT NULL DEFAULT 0,
+      avatar_rotated_at INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       summarized_count INTEGER NOT NULL DEFAULT 0
     );
+
+    -- A gallery of profile pics per persona (uploaded or AI-generated).
+    CREATE TABLE IF NOT EXISTS rp_persona_images (
+      id TEXT PRIMARY KEY,
+      persona_id TEXT NOT NULL REFERENCES rp_personas(id) ON DELETE CASCADE,
+      data_url TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_rp_persona_images ON rp_persona_images(persona_id);
 
     CREATE TABLE IF NOT EXISTS rp_scenes (
       id TEXT PRIMARY KEY,
@@ -148,6 +161,7 @@ export function initDb(): void {
       scene_id TEXT NOT NULL REFERENCES rp_scenes(id) ON DELETE CASCADE,
       sender_persona_id TEXT,
       content TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'chat',
       created_at INTEGER NOT NULL
     );
 
@@ -165,6 +179,18 @@ export function initDb(): void {
   // RP migration: add the "is me" flag to personas created before group scenes.
   if (!columnExists('rp_personas', 'is_me')) {
     db.exec('ALTER TABLE rp_personas ADD COLUMN is_me INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!columnExists('rp_personas', 'avatar_image')) {
+    db.exec("ALTER TABLE rp_personas ADD COLUMN avatar_image TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists('rp_personas', 'avatar_rotate_daily')) {
+    db.exec('ALTER TABLE rp_personas ADD COLUMN avatar_rotate_daily INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!columnExists('rp_personas', 'avatar_rotated_at')) {
+    db.exec('ALTER TABLE rp_personas ADD COLUMN avatar_rotated_at INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!columnExists('rp_scene_messages', 'kind')) {
+    db.exec("ALTER TABLE rp_scene_messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'chat'");
   }
 
   // Lightweight migrations.
@@ -719,6 +745,9 @@ interface RPPersonaRow {
   greeting: string;
   model: string;
   is_me: number;
+  avatar_image: string | null;
+  avatar_rotate_daily: number | null;
+  avatar_rotated_at: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -729,6 +758,8 @@ function mapPersona(r: RPPersonaRow): RPPersona {
     name: r.name,
     description: r.description,
     avatar: r.avatar,
+    avatarImage: r.avatar_image ?? '',
+    avatarRotateDaily: !!r.avatar_rotate_daily,
     greeting: r.greeting,
     model: r.model,
     isMe: !!r.is_me,
@@ -753,6 +784,7 @@ export function rpCreatePersona(data: {
   name: string;
   description: string;
   avatar?: string;
+  avatarImage?: string;
   greeting?: string;
   model: string;
   isMe?: boolean;
@@ -766,12 +798,15 @@ export function rpCreatePersona(data: {
     greeting: data.greeting ?? '',
     model: data.model,
     is_me: data.isMe ? 1 : 0,
+    avatar_image: data.avatarImage ?? '',
+    avatar_rotate_daily: 0,
+    avatar_rotated_at: 0,
     created_at: now,
     updated_at: now,
   };
   db.prepare(
-    `INSERT INTO rp_personas (id, name, description, avatar, greeting, model, is_me, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO rp_personas (id, name, description, avatar, greeting, model, is_me, avatar_image, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     row.id,
     row.name,
@@ -780,6 +815,7 @@ export function rpCreatePersona(data: {
     row.greeting,
     row.model,
     row.is_me,
+    row.avatar_image,
     row.created_at,
     row.updated_at
   );
@@ -789,7 +825,19 @@ export function rpCreatePersona(data: {
 
 export function rpUpdatePersona(
   id: string,
-  patch: Partial<Pick<RPPersona, 'name' | 'description' | 'avatar' | 'greeting' | 'model' | 'isMe'>>
+  patch: Partial<
+    Pick<
+      RPPersona,
+      | 'name'
+      | 'description'
+      | 'avatar'
+      | 'avatarImage'
+      | 'greeting'
+      | 'model'
+      | 'isMe'
+      | 'avatarRotateDaily'
+    >
+  >
 ): void {
   const cols: string[] = [];
   const vals: (string | number)[] = [];
@@ -797,6 +845,7 @@ export function rpUpdatePersona(
     name: 'name',
     description: 'description',
     avatar: 'avatar',
+    avatarImage: 'avatar_image',
     greeting: 'greeting',
     model: 'model',
   };
@@ -811,6 +860,10 @@ export function rpUpdatePersona(
     cols.push('is_me = ?');
     vals.push(patch.isMe ? 1 : 0);
   }
+  if (typeof patch.avatarRotateDaily === 'boolean') {
+    cols.push('avatar_rotate_daily = ?');
+    vals.push(patch.avatarRotateDaily ? 1 : 0);
+  }
   if (cols.length === 0) return;
   cols.push('updated_at = ?');
   vals.push(Date.now());
@@ -821,6 +874,72 @@ export function rpUpdatePersona(
 
 export function rpDeletePersona(id: string): void {
   db.prepare('DELETE FROM rp_personas WHERE id = ?').run(id);
+}
+
+// ---------- Persona profile-pic gallery ----------
+
+interface RPImageRow {
+  id: string;
+  persona_id: string;
+  data_url: string;
+  created_at: number;
+}
+
+function mapImage(r: RPImageRow): RPPersonaImage {
+  return { id: r.id, personaId: r.persona_id, dataUrl: r.data_url, createdAt: r.created_at };
+}
+
+export function rpGetPersonaImages(personaId: string): RPPersonaImage[] {
+  const rows = db
+    .prepare('SELECT * FROM rp_persona_images WHERE persona_id = ? ORDER BY created_at DESC')
+    .all(personaId) as RPImageRow[];
+  return rows.map(mapImage);
+}
+
+export function rpAddPersonaImage(personaId: string, dataUrl: string): RPPersonaImage {
+  const row: RPImageRow = {
+    id: randomUUID(),
+    persona_id: personaId,
+    data_url: dataUrl,
+    created_at: Date.now(),
+  };
+  db.prepare(
+    'INSERT INTO rp_persona_images (id, persona_id, data_url, created_at) VALUES (?, ?, ?, ?)'
+  ).run(row.id, row.persona_id, row.data_url, row.created_at);
+  return mapImage(row);
+}
+
+export function rpDeletePersonaImage(imageId: string): void {
+  db.prepare('DELETE FROM rp_persona_images WHERE id = ?').run(imageId);
+}
+
+// For each persona set to auto-rotate, if its avatar hasn't changed in ~a day and
+// it has a gallery, switch to a different random pic. Returns how many changed.
+export function rpRotateDueAvatars(): number {
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const due = db
+    .prepare('SELECT * FROM rp_personas WHERE avatar_rotate_daily = 1')
+    .all() as RPPersonaRow[];
+  let changed = 0;
+  for (const p of due) {
+    if (now - (p.avatar_rotated_at ?? 0) < DAY) continue;
+    const imgs = db
+      .prepare('SELECT data_url FROM rp_persona_images WHERE persona_id = ?')
+      .all(p.id) as { data_url: string }[];
+    if (imgs.length === 0) continue;
+    const others = imgs.filter((i) => i.data_url !== p.avatar_image);
+    const pool = others.length > 0 ? others : imgs;
+    // Deterministic-ish pick without Math.random: rotate by day count.
+    const pick = pool[Math.floor(now / DAY) % pool.length].data_url;
+    db.prepare('UPDATE rp_personas SET avatar_image = ?, avatar_rotated_at = ? WHERE id = ?').run(
+      pick,
+      now,
+      p.id
+    );
+    changed++;
+  }
+  return changed;
 }
 
 // ---------- Role-Play scenes (group conversations) ----------
@@ -937,6 +1056,7 @@ interface RPMessageRow {
   scene_id: string;
   sender_persona_id: string | null;
   content: string;
+  kind: string | null;
   created_at: number;
 }
 
@@ -946,6 +1066,7 @@ function mapRPMessage(r: RPMessageRow): RPMessage {
     sceneId: r.scene_id,
     senderPersonaId: r.sender_persona_id,
     content: r.content,
+    kind: (r.kind as RPMessage['kind']) ?? 'chat',
     createdAt: r.created_at,
   };
 }
@@ -961,6 +1082,7 @@ export function rpSaveSceneMessage(msg: {
   sceneId: string;
   senderPersonaId: string | null;
   content: string;
+  kind?: string;
 }): RPMessage {
   const maxRow = db
     .prepare('SELECT MAX(created_at) AS m FROM rp_scene_messages WHERE scene_id = ?')
@@ -971,11 +1093,12 @@ export function rpSaveSceneMessage(msg: {
     scene_id: msg.sceneId,
     sender_persona_id: msg.senderPersonaId,
     content: msg.content,
+    kind: msg.kind ?? 'chat',
     created_at: createdAt,
   };
   db.prepare(
-    'INSERT INTO rp_scene_messages (id, scene_id, sender_persona_id, content, created_at) VALUES (?, ?, ?, ?, ?)'
-  ).run(row.id, row.scene_id, row.sender_persona_id, row.content, row.created_at);
+    'INSERT INTO rp_scene_messages (id, scene_id, sender_persona_id, content, kind, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(row.id, row.scene_id, row.sender_persona_id, row.content, row.kind, row.created_at);
   touchScene(msg.sceneId);
   return mapRPMessage(row);
 }
