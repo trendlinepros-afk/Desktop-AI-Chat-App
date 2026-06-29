@@ -48,6 +48,10 @@ interface RPState {
   haveSpeak: (personaId: string) => Promise<void>;
   stop: () => void;
   summarizeNow: (sceneId: string) => Promise<void>;
+  syncFromVault: () => Promise<void>;
+  editMessage: (id: string, content: string) => Promise<void>;
+  deleteMessage: (id: string) => Promise<void>;
+  regenerateLast: () => Promise<void>;
 
   mePersona: () => RPPersona | undefined;
   personaById: (id: string | null) => RPPersona | undefined;
@@ -187,6 +191,52 @@ export const useRPStore = create<RPState>((set, get) => ({
 
   stop: () => {
     cancelled = true;
+    set({ generating: false, speakingId: null });
+  },
+
+  syncFromVault: async () => {
+    const sceneId = get().activeSceneId;
+    if (!sceneId) return;
+    const settings = useSettingsStore.getState().settings;
+    const toast = useUIStore.getState().toast;
+    if (!settings.rpVaultPath) {
+      toast('No RP vault configured — choose one in RP Settings', 'error');
+      return;
+    }
+    const res = await window.polyglot.rpSyncFromVault(sceneId);
+    await get().loadPersonas();
+    toast(
+      res.updated > 0
+        ? `Synced ${res.updated} persona(s) and memory from the vault`
+        : 'Conversation is already up to date with the vault',
+      'success'
+    );
+  },
+
+  editMessage: async (id, content) => {
+    await window.polyglot.rpUpdateSceneMessage(id, content);
+    set({ messages: get().messages.map((m) => (m.id === id ? { ...m, content } : m)) });
+  },
+
+  deleteMessage: async (id) => {
+    await window.polyglot.rpDeleteSceneMessage(id);
+    set({ messages: get().messages.filter((m) => m.id !== id) });
+  },
+
+  // Re-roll the most recent character line (delete it and let that same
+  // character respond again).
+  regenerateLast: async () => {
+    const sceneId = get().activeSceneId;
+    if (!sceneId || get().generating) return;
+    const msgs = get().messages;
+    const last = msgs[msgs.length - 1];
+    if (!last) return;
+    const persona = get().personaById(last.senderPersonaId);
+    if (!persona || persona.isMe) return; // only re-roll a character's line
+    await window.polyglot.rpDeleteSceneMessage(last.id);
+    set({ messages: msgs.slice(0, -1), generating: true });
+    cancelled = false;
+    await generateFor(get, set, sceneId, persona);
     set({ generating: false, speakingId: null });
   },
 

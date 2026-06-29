@@ -303,6 +303,8 @@ export interface WickedAPI {
     senderPersonaId: string | null;
     content: string;
   }): Promise<RPMessage>;
+  rpUpdateSceneMessage(id: string, content: string): Promise<void>;
+  rpDeleteSceneMessage(id: string): Promise<void>;
   rpClearScene(sceneId: string): Promise<void>;
 
   // RP memory — markdown files in a folder kept separate from the Brain vault
@@ -311,6 +313,7 @@ export interface WickedAPI {
   rpClearMemory(sceneId: string): Promise<void>;
   rpOpenMemoryFolder(): Promise<void>;
   rpSyncProfiles(): Promise<void>;
+  rpSyncFromVault(sceneId: string): Promise<{ updated: number; memoryChars: number }>;
 
   // Grok (xAI) completion — run in the main process to avoid renderer CORS.
   rpGrokComplete(

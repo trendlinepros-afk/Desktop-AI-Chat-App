@@ -87,6 +87,59 @@ export function writePersonaProfile(persona: RPPersona): void {
   fs.writeFileSync(target, content, 'utf-8');
 }
 
+export interface ParsedProfile {
+  id: string;
+  name: string;
+  avatar: string;
+  description: string;
+  greeting: string;
+}
+
+// Pull a section's body out of the profile markdown (text under "## Heading"
+// up to the next "## " or end of file).
+function section(body: string, heading: string): string {
+  const re = new RegExp(`##\\s+${heading}\\s*\\n([\\s\\S]*?)(?:\\n##\\s|$)`, 'i');
+  const m = re.exec(body);
+  return m ? m[1].trim() : '';
+}
+
+// Read every persona profile back out of the vault (so edits made in Obsidian
+// can flow back into the app). Returns only the story-relevant fields.
+export function readPersonaProfiles(): ParsedProfile[] {
+  const dir = path.join(memoryRoot(), 'Personas');
+  if (!fs.existsSync(dir)) return [];
+  const out: ParsedProfile[] = [];
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith('.md')) continue;
+    let raw = '';
+    try {
+      raw = fs.readFileSync(path.join(dir, name), 'utf-8');
+    } catch {
+      continue;
+    }
+    const fmMatch = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/.exec(raw);
+    if (!fmMatch) continue;
+    const fm: Record<string, string> = {};
+    for (const line of fmMatch[1].split('\n')) {
+      const idx = line.indexOf(':');
+      if (idx === -1) continue;
+      fm[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+    }
+    const id = fm.rp_persona_id;
+    if (!id) continue;
+    const body = fmMatch[2];
+    const description = section(body, 'Character').replace(/^_No description yet\._$/, '');
+    out.push({
+      id,
+      name: fm.title || '',
+      avatar: fm.avatar || '🎭',
+      description,
+      greeting: section(body, 'Opening line'),
+    });
+  }
+  return out;
+}
+
 export function deletePersonaProfile(personaId: string): void {
   const dir = path.join(memoryRoot(), 'Personas');
   const existing = findFileById(dir, `rp_persona_id: ${personaId}`);

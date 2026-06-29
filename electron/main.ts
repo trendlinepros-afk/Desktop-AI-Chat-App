@@ -345,6 +345,29 @@ function registerIpc(): void {
   ipcMain.handle('rp:syncProfiles', () =>
     safeVault(() => rpMemory.syncPersonaProfiles(db.rpGetPersonas()), undefined)
   );
+  // Pull persona edits made in the Obsidian vault back into the app so the
+  // currently-open story uses the latest character info. Scene memory is already
+  // read live each turn; this returns its size so the UI can confirm.
+  ipcMain.handle('rp:syncFromVault', (_e, sceneId: string) =>
+    safeVault(
+      () => {
+        const known = new Map(db.rpGetPersonas().map((p) => [p.id, p]));
+        let updated = 0;
+        for (const prof of rpMemory.readPersonaProfiles()) {
+          if (!known.has(prof.id)) continue;
+          db.rpUpdatePersona(prof.id, {
+            name: prof.name || known.get(prof.id)!.name,
+            avatar: prof.avatar,
+            description: prof.description,
+            greeting: prof.greeting,
+          });
+          updated++;
+        }
+        return { updated, memoryChars: rpMemory.readMemory(sceneId).length };
+      },
+      { updated: 0, memoryChars: 0 }
+    )
+  );
 
   // Scenes
   ipcMain.handle('rp:getScenes', () => db.rpGetScenes());
@@ -365,6 +388,10 @@ function registerIpc(): void {
   );
   ipcMain.handle('rp:getSceneMessages', (_e, sceneId: string) => db.rpGetSceneMessages(sceneId));
   ipcMain.handle('rp:saveSceneMessage', (_e, msg) => db.rpSaveSceneMessage(msg));
+  ipcMain.handle('rp:updateSceneMessage', (_e, id: string, content: string) =>
+    db.rpUpdateSceneMessage(id, content)
+  );
+  ipcMain.handle('rp:deleteSceneMessage', (_e, id: string) => db.rpDeleteSceneMessage(id));
   ipcMain.handle('rp:clearScene', (_e, sceneId: string) => {
     db.rpClearScene(sceneId);
     safeVault(() => rpMemory.clearMemory(sceneId), undefined);

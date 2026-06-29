@@ -947,3 +947,12 @@ export function rpClearScene(sceneId: string): void {
   db.prepare('DELETE FROM rp_scene_messages WHERE scene_id = ?').run(sceneId);
   db.prepare('UPDATE rp_scenes SET summarized_count = 0 WHERE id = ?').run(sceneId);
 }
+
+// Edit a message in place (used to tweak an AI reply so the story stays on track).
+export function rpUpdateSceneMessage(id: string, content: string): void {
+  db.prepare('UPDATE rp_scene_messages SET content = ? WHERE id = ?').run(content, id);
+}
+
+export function rpDeleteSceneMessage(id: string): void {
+  db.prepare('DELETE FROM rp_scene_messages WHERE id = ?').run(id);
+}
