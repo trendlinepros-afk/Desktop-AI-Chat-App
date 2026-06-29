@@ -7,6 +7,18 @@ export interface ModelSuggestion {
   reason: string;
 }
 
+const IMAGE_NOUN = '(image|picture|photo|logo|art|artwork|illustration|icon|wallpaper|drawing|graphic|sticker|avatar|banner|poster|mockup)';
+
+// Does this text read like a request to GENERATE an image (vs. discuss one)?
+export function isImageRequest(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    new RegExp(`\\b(generate|create|draw|make|render|design|need|want|build|give me|sketch)\\b[\\s\\S]{0,40}\\b${IMAGE_NOUN}\\b`).test(t) ||
+    new RegExp(`\\b${IMAGE_NOUN}\\s+(of|for|that|with|showing|in)\\b`).test(t) ||
+    /\b(image|picture|photo) of\b/.test(t)
+  );
+}
+
 // Purely local heuristics — no API call. Returns a suggestion only when there's
 // a reasonably strong signal that a different model would serve the request better.
 export function suggestModel(parts: ContentPart[]): ModelSuggestion | null {
@@ -28,12 +40,11 @@ export function suggestModel(parts: ContentPart[]): ModelSuggestion | null {
   }
 
   // 2. Explicit image-generation intent → Gemini Imagen.
-  if (/\b(generate|create|draw|make|render)\b.*\b(image|picture|photo|logo|art|illustration|icon)\b/.test(text) ||
-      /\b(image|picture) of\b/.test(text)) {
+  if (isImageRequest(text)) {
     return {
       provider: 'gemini',
-      modelVersion: 'imagen-3.0-generate-001',
-      label: 'Imagen 3 (Gemini image gen)',
+      modelVersion: 'imagen-3.0-generate-002',
+      label: 'Imagen (image gen)',
       reason: 'Looks like you want to generate an image — switch on Gemini Image Gen.',
     };
   }
