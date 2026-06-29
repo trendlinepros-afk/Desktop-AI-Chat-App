@@ -31,7 +31,11 @@ export function Message({ message, chat }: { message: MessageType; chat: Chat })
   return (
     <div className={`group mb-5 flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
-        <div className="mb-1 flex items-center gap-2 text-xs text-text-muted">
+        <div
+          className={`mb-1 flex items-center gap-2 text-xs text-text-muted ${
+            isUser ? 'justify-end' : 'justify-start'
+          }`}
+        >
           {isUser ? (
             <span>You</span>
           ) : (
@@ -41,6 +45,11 @@ export function Message({ message, chat }: { message: MessageType; chat: Chat })
                 style={{ backgroundColor: providerColor(msgProvider) }}
               />
               {versionLabel(msgProvider, msgModel)}
+            </span>
+          )}
+          {message.createdAt > 0 && (
+            <span className="text-text-muted/70" title={new Date(message.createdAt).toLocaleString()}>
+              {formatTimestamp(message.createdAt)}
             </span>
           )}
         </div>
@@ -123,6 +132,26 @@ export function Message({ message, chat }: { message: MessageType; chat: Chat })
       </div>
     </div>
   );
+}
+
+// Compact bubble timestamp: just the time for today, "Mon D, h:mm AM" for
+// older dates, and a full date for other years. Full value is in the title.
+function formatTimestamp(ts: number): string {
+  const d = new Date(ts);
+  const now = new Date();
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) return time;
+  const sameYear = d.getFullYear() === now.getFullYear();
+  const date = d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
+  return `${date}, ${time}`;
 }
 
 function ActionBtn({ label, onClick }: { label: string; onClick: () => void }) {

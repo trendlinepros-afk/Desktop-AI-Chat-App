@@ -6,6 +6,7 @@ import { useBrainStore } from '../../store/brainStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { ThemeToggle } from '../ThemeToggle';
 import { listOllamaModels, listRunningOllamaModels, setOllamaLoaded } from '../../lib/ollama';
+import { listChatModels, listImageModels } from '../../lib/models';
 import { useUIStore } from '../../store/uiStore';
 
 export function ModelSelector({ chat }: { chat: Chat }) {
@@ -15,13 +16,41 @@ export function ModelSelector({ chat }: { chat: Chat }) {
   const imageGen = useChatStore((s) => s.imageGenMode[chat.id] ?? false);
   const setImageGen = useChatStore((s) => s.setImageGen);
   const togglePanel = useBrainStore((s) => s.togglePanel);
-  const ollamaBaseUrl = useSettingsStore((s) => s.settings.ollamaBaseUrl);
+  const settings = useSettingsStore((s) => s.settings);
+  const ollamaBaseUrl = settings.ollamaBaseUrl;
   const toast = useUIStore((s) => s.toast);
   const [ollamaModels, setOllamaModels] = useState<ModelVersion[]>([]);
+  const [liveModels, setLiveModels] = useState<ModelVersion[]>([]);
+  const [liveImageModels, setLiveImageModels] = useState<ModelVersion[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loadingBusy, setLoadingBusy] = useState(false);
 
   const cfg = MODEL_CONFIG[chat.provider];
+
+  // For API providers, list the models the key can actually call (so new
+  // models appear automatically). Falls back to the hardcoded defaults on error.
+  useEffect(() => {
+    if (chat.provider === 'ollama') return;
+    setLiveModels([]);
+    setLiveImageModels([]);
+    let cancelled = false;
+    listChatModels(chat.provider, settings)
+      .then((models) => {
+        if (!cancelled && models.length > 0) setLiveModels(models);
+      })
+      .catch(() => {});
+    if (chat.provider === 'gemini' && settings.geminiApiKey) {
+      listImageModels(settings.geminiApiKey)
+        .then((models) => {
+          if (!cancelled && models.length > 0) setLiveImageModels(models);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.provider, settings.geminiApiKey, settings.openaiApiKey, settings.deepseekApiKey]);
 
   // For Ollama, list the models actually installed on the local server.
   useEffect(() => {
@@ -74,8 +103,16 @@ export function ModelSelector({ chat }: { chat: Chat }) {
   };
 
   const baseVersions =
-    chat.provider === 'ollama' && ollamaModels.length > 0 ? ollamaModels : cfg.versions;
-  const versions = imageGen && cfg.imageGenVersions ? cfg.imageGenVersions : baseVersions;
+    chat.provider === 'ollama'
+      ? ollamaModels.length > 0
+        ? ollamaModels
+        : cfg.versions
+      : liveModels.length > 0
+        ? liveModels
+        : cfg.versions;
+  const imageVersions =
+    liveImageModels.length > 0 ? liveImageModels : cfg.imageGenVersions ?? [];
+  const versions = imageGen && imageVersions.length > 0 ? imageVersions : baseVersions;
 
   return (
     <div className="flex items-center gap-2 border-b border-edge bg-topbar px-4 py-2 text-sm">
@@ -139,7 +176,7 @@ export function ModelSelector({ chat }: { chat: Chat }) {
             const next = !imageGen;
             setImageGen(chat.id, next);
             const ver = next
-              ? cfg.imageGenVersions![0].id
+              ? imageVersions[0]?.id ?? cfg.imageGenVersions![0].id
               : defaultVersionFor('gemini');
             setChatModel(chat.id, 'gemini', ver);
           }}
