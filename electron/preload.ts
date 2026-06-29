@@ -88,6 +88,21 @@ const api: WickedAPI = {
   listOpenAICompatModels: (baseUrl, apiKey) =>
     ipcRenderer.invoke('models:listOpenAICompat', baseUrl, apiKey),
 
+  // Role-Play (RP)
+  rpGetPersonas: () => ipcRenderer.invoke('rp:getPersonas'),
+  rpCreatePersona: (data) => ipcRenderer.invoke('rp:createPersona', data),
+  rpUpdatePersona: (id, patch) => ipcRenderer.invoke('rp:updatePersona', id, patch),
+  rpDeletePersona: (id) => ipcRenderer.invoke('rp:deletePersona', id),
+  rpGetMessages: (personaId) => ipcRenderer.invoke('rp:getMessages', personaId),
+  rpSaveMessage: (msg) => ipcRenderer.invoke('rp:saveMessage', msg),
+  rpClearMessages: (personaId) => ipcRenderer.invoke('rp:clearMessages', personaId),
+  rpSetSummarized: (personaId, count) => ipcRenderer.invoke('rp:setSummarized', personaId, count),
+  rpReadMemory: (personaId) => ipcRenderer.invoke('rp:readMemory', personaId),
+  rpAppendMemory: (personaId, personaName, summary) =>
+    ipcRenderer.invoke('rp:appendMemory', personaId, personaName, summary),
+  rpClearMemory: (personaId) => ipcRenderer.invoke('rp:clearMemory', personaId),
+  rpOpenMemoryFolder: () => ipcRenderer.invoke('rp:openMemoryFolder'),
+
   // Shell
   openExternal: (p) => ipcRenderer.invoke('shell:openExternal', p),
 };

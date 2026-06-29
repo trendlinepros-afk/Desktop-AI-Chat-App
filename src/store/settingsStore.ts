@@ -19,6 +19,10 @@ const EMPTY: Settings = {
   ollamaBaseUrl: 'http://localhost:11434',
   autoMemoryEnabled: false,
   autoMemoryIntervalMinutes: 30,
+  grokApiKey: '',
+  grokModel: 'grok-3',
+  rpMemoryEnabled: true,
+  rpSummarizeEvery: 20,
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

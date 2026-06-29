@@ -81,6 +81,31 @@ export interface MemoryReview {
   category: string;
 }
 
+// ---------- Role-Play (RP) ----------
+// A separate, self-contained side of the app: build personas of people you can
+// talk to. Personas, their chats, and their memory are kept entirely apart from
+// the main app's chats and the Obsidian Brain vault.
+
+export interface RPPersona {
+  id: string;
+  name: string;
+  description: string; // personality / background — drives the system prompt
+  avatar: string; // an emoji shown in the list
+  greeting: string; // optional opening line the persona sends first
+  model: string; // Grok model used for this persona
+  createdAt: number;
+  updatedAt: number;
+  summarizedCount: number; // # of messages already folded into the memory file
+}
+
+export interface RPMessage {
+  id: string;
+  personaId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: number;
+}
+
 export interface McpServerConfig {
   id: string;
   name: string;
@@ -117,6 +142,11 @@ export interface Settings {
   ollamaBaseUrl: string; // e.g. http://localhost:11434
   autoMemoryEnabled: boolean; // periodically commit chats to memory
   autoMemoryIntervalMinutes: number; // how often the scheduler runs
+  // Role-Play (RP) side — a separate chatbot powered by the Grok (xAI) API.
+  grokApiKey: string;
+  grokModel: string; // default Grok model for new personas
+  rpMemoryEnabled: boolean; // periodically summarize RP chats into memory files
+  rpSummarizeEvery: number; // summarize after this many new messages
 }
 
 export const VAULT_CATEGORIES = [
@@ -228,6 +258,35 @@ export interface WickedAPI {
 
   // Model discovery (OpenAI/DeepSeek listed in the main process to avoid CORS)
   listOpenAICompatModels(baseUrl: string, apiKey: string): Promise<string[]>;
+
+  // Role-Play (RP) — personas + their chats, stored separately from main chats
+  rpGetPersonas(): Promise<RPPersona[]>;
+  rpCreatePersona(data: {
+    name: string;
+    description: string;
+    avatar?: string;
+    greeting?: string;
+    model: string;
+  }): Promise<RPPersona>;
+  rpUpdatePersona(
+    id: string,
+    patch: Partial<Pick<RPPersona, 'name' | 'description' | 'avatar' | 'greeting' | 'model'>>
+  ): Promise<void>;
+  rpDeletePersona(id: string): Promise<void>;
+  rpGetMessages(personaId: string): Promise<RPMessage[]>;
+  rpSaveMessage(msg: {
+    personaId: string;
+    role: 'user' | 'assistant';
+    content: string;
+  }): Promise<RPMessage>;
+  rpClearMessages(personaId: string): Promise<void>;
+  rpSetSummarized(personaId: string, count: number): Promise<void>;
+
+  // RP memory — markdown files in a folder kept separate from the Brain vault
+  rpReadMemory(personaId: string): Promise<string>;
+  rpAppendMemory(personaId: string, personaName: string, summary: string): Promise<void>;
+  rpClearMemory(personaId: string): Promise<void>;
+  rpOpenMemoryFolder(): Promise<void>;
 
   // Shell
   openExternal(path: string): Promise<void>;

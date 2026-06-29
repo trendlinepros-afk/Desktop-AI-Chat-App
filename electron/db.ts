@@ -2,10 +2,10 @@ import Database from 'better-sqlite3';
 import { app, safeStorage } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { Chat, Folder, Message, Provider, Settings } from '../src/types';
+import type { Chat, Folder, Message, Provider, RPMessage, RPPersona, Settings } from '../src/types';
 
 // API keys are stored encrypted at rest via the OS keychain (safeStorage).
-const SECRET_KEYS = new Set(['openaiApiKey', 'geminiApiKey', 'deepseekApiKey']);
+const SECRET_KEYS = new Set(['openaiApiKey', 'geminiApiKey', 'deepseekApiKey', 'grokApiKey']);
 const ENC_PREFIX = 'enc:v1:';
 
 function encryptSecret(value: string): string {
@@ -42,6 +42,10 @@ const DEFAULT_SETTINGS: Settings = {
   ollamaBaseUrl: 'http://localhost:11434',
   autoMemoryEnabled: false,
   autoMemoryIntervalMinutes: 30,
+  grokApiKey: '',
+  grokModel: 'grok-3',
+  rpMemoryEnabled: true,
+  rpSummarizeEvery: 20,
 };
 
 export function initDb(): void {
@@ -98,6 +102,30 @@ export function initDb(): void {
     CREATE INDEX IF NOT EXISTS idx_messages_chat ON messages(chat_id);
     CREATE INDEX IF NOT EXISTS idx_chats_folder ON chats(folder_id);
     CREATE INDEX IF NOT EXISTS idx_links_source ON chat_links(source_chat_id);
+
+    -- Role-Play (RP): personas and their chats live in their own tables so they
+    -- never mix with the main app's chats/messages.
+    CREATE TABLE IF NOT EXISTS rp_personas (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      avatar TEXT NOT NULL DEFAULT '🎭',
+      greeting TEXT NOT NULL DEFAULT '',
+      model TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      summarized_count INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS rp_messages (
+      id TEXT PRIMARY KEY,
+      persona_id TEXT NOT NULL REFERENCES rp_personas(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_rp_messages_persona ON rp_messages(persona_id);
   `);
 
   // Lightweight migrations.
@@ -589,6 +617,14 @@ export function getSettings(): Settings {
     autoMemoryIntervalMinutes: map.has('autoMemoryIntervalMinutes')
       ? Number(map.get('autoMemoryIntervalMinutes'))
       : DEFAULT_SETTINGS.autoMemoryIntervalMinutes,
+    grokApiKey: decryptSecret(map.get('grokApiKey') ?? DEFAULT_SETTINGS.grokApiKey),
+    grokModel: map.get('grokModel') ?? DEFAULT_SETTINGS.grokModel,
+    rpMemoryEnabled: map.has('rpMemoryEnabled')
+      ? map.get('rpMemoryEnabled') === 'true'
+      : DEFAULT_SETTINGS.rpMemoryEnabled,
+    rpSummarizeEvery: map.has('rpSummarizeEvery')
+      ? Number(map.get('rpSummarizeEvery'))
+      : DEFAULT_SETTINGS.rpSummarizeEvery,
   };
 }
 
@@ -623,4 +659,167 @@ export function setSettingRaw(key: string, value: string): void {
   db.prepare(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   ).run(key, value);
+}
+
+// ---------- Role-Play personas + messages ----------
+
+interface RPPersonaRow {
+  id: string;
+  name: string;
+  description: string;
+  avatar: string;
+  greeting: string;
+  model: string;
+  created_at: number;
+  updated_at: number;
+  summarized_count: number;
+}
+
+function mapPersona(r: RPPersonaRow): RPPersona {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    avatar: r.avatar,
+    greeting: r.greeting,
+    model: r.model,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    summarizedCount: r.summarized_count,
+  };
+}
+
+export function rpGetPersonas(): RPPersona[] {
+  const rows = db
+    .prepare('SELECT * FROM rp_personas ORDER BY updated_at DESC')
+    .all() as RPPersonaRow[];
+  return rows.map(mapPersona);
+}
+
+export function rpCreatePersona(data: {
+  name: string;
+  description: string;
+  avatar?: string;
+  greeting?: string;
+  model: string;
+}): RPPersona {
+  const now = Date.now();
+  const row: RPPersonaRow = {
+    id: randomUUID(),
+    name: data.name,
+    description: data.description,
+    avatar: data.avatar || '🎭',
+    greeting: data.greeting ?? '',
+    model: data.model,
+    created_at: now,
+    updated_at: now,
+    summarized_count: 0,
+  };
+  db.prepare(
+    `INSERT INTO rp_personas (id, name, description, avatar, greeting, model, created_at, updated_at, summarized_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    row.id,
+    row.name,
+    row.description,
+    row.avatar,
+    row.greeting,
+    row.model,
+    row.created_at,
+    row.updated_at,
+    row.summarized_count
+  );
+  return mapPersona(row);
+}
+
+export function rpUpdatePersona(
+  id: string,
+  patch: Partial<Pick<RPPersona, 'name' | 'description' | 'avatar' | 'greeting' | 'model'>>
+): void {
+  const cols: string[] = [];
+  const vals: (string | number)[] = [];
+  const map: Record<string, string> = {
+    name: 'name',
+    description: 'description',
+    avatar: 'avatar',
+    greeting: 'greeting',
+    model: 'model',
+  };
+  for (const [key, col] of Object.entries(map)) {
+    const v = (patch as Record<string, unknown>)[key];
+    if (typeof v === 'string') {
+      cols.push(`${col} = ?`);
+      vals.push(v);
+    }
+  }
+  if (cols.length === 0) return;
+  cols.push('updated_at = ?');
+  vals.push(Date.now());
+  vals.push(id);
+  db.prepare(`UPDATE rp_personas SET ${cols.join(', ')} WHERE id = ?`).run(...vals);
+}
+
+export function rpDeletePersona(id: string): void {
+  db.prepare('DELETE FROM rp_personas WHERE id = ?').run(id);
+}
+
+export function rpSetSummarized(personaId: string, count: number): void {
+  db.prepare('UPDATE rp_personas SET summarized_count = ? WHERE id = ?').run(count, personaId);
+}
+
+function touchPersona(id: string): void {
+  db.prepare('UPDATE rp_personas SET updated_at = ? WHERE id = ?').run(Date.now(), id);
+}
+
+interface RPMessageRow {
+  id: string;
+  persona_id: string;
+  role: string;
+  content: string;
+  created_at: number;
+}
+
+function mapRPMessage(r: RPMessageRow): RPMessage {
+  return {
+    id: r.id,
+    personaId: r.persona_id,
+    role: r.role as RPMessage['role'],
+    content: r.content,
+    createdAt: r.created_at,
+  };
+}
+
+export function rpGetMessages(personaId: string): RPMessage[] {
+  const rows = db
+    .prepare('SELECT * FROM rp_messages WHERE persona_id = ? ORDER BY created_at ASC')
+    .all(personaId) as RPMessageRow[];
+  return rows.map(mapRPMessage);
+}
+
+export function rpSaveMessage(msg: {
+  personaId: string;
+  role: RPMessage['role'];
+  content: string;
+}): RPMessage {
+  const maxRow = db
+    .prepare('SELECT MAX(created_at) AS m FROM rp_messages WHERE persona_id = ?')
+    .get(msg.personaId) as { m: number | null };
+  const createdAt = Math.max(Date.now(), (maxRow?.m ?? 0) + 1);
+  const row: RPMessageRow = {
+    id: randomUUID(),
+    persona_id: msg.personaId,
+    role: msg.role,
+    content: msg.content,
+    created_at: createdAt,
+  };
+  db.prepare(
+    'INSERT INTO rp_messages (id, persona_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).run(row.id, row.persona_id, row.role, row.content, row.created_at);
+  touchPersona(msg.personaId);
+  return mapRPMessage(row);
+}
+
+export function rpClearMessages(personaId: string): void {
+  db.prepare('DELETE FROM rp_messages WHERE persona_id = ?').run(personaId);
+  db.prepare('UPDATE rp_personas SET summarized_count = 0 WHERE id = ?').run(personaId);
 }
