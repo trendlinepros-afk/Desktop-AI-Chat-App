@@ -91,12 +91,22 @@ export interface RPPersona {
   id: string;
   name: string;
   description: string; // personality / background — drives the system prompt
-  avatar: string; // an emoji shown in the list
+  avatar: string; // an emoji shown in the list (fallback when no photo)
+  avatarImage: string; // current profile pic as a data URL ('' = use the emoji)
+  avatarRotateDaily: boolean; // auto-pick a new gallery pic each day
   greeting: string; // optional opening line the persona sends first
   model: string; // Grok model used for this persona
   isMe: boolean; // marks the persona that represents YOU (your background)
   createdAt: number;
   updatedAt: number;
+}
+
+// A saved profile pic in a persona's gallery.
+export interface RPPersonaImage {
+  id: string;
+  personaId: string;
+  dataUrl: string;
+  createdAt: number;
 }
 
 // A group conversation containing one or more personas.
@@ -113,6 +123,7 @@ export interface RPMessage {
   sceneId: string;
   senderPersonaId: string | null; // null = a line typed by you (the human)
   content: string;
+  kind: 'chat' | 'director'; // 'director' = an out-of-character steer you wrote
   createdAt: number;
 }
 
@@ -277,6 +288,7 @@ export interface WickedAPI {
     name: string;
     description: string;
     avatar?: string;
+    avatarImage?: string;
     greeting?: string;
     model: string;
     isMe?: boolean;
@@ -284,10 +296,19 @@ export interface WickedAPI {
   rpUpdatePersona(
     id: string,
     patch: Partial<
-      Pick<RPPersona, 'name' | 'description' | 'avatar' | 'greeting' | 'model' | 'isMe'>
+      Pick<
+        RPPersona,
+        'name' | 'description' | 'avatar' | 'avatarImage' | 'greeting' | 'model' | 'isMe'
+      >
     >
   ): Promise<void>;
   rpDeletePersona(id: string): Promise<void>;
+
+  // Persona profile-pic gallery + daily rotation
+  rpGetPersonaImages(personaId: string): Promise<RPPersonaImage[]>;
+  rpAddPersonaImage(personaId: string, dataUrl: string): Promise<RPPersonaImage>;
+  rpDeletePersonaImage(imageId: string): Promise<void>;
+  rpRotateDueAvatars(): Promise<number>;
 
   // Scenes (group conversations)
   rpGetScenes(): Promise<RPScene[]>;
@@ -304,6 +325,7 @@ export interface WickedAPI {
     sceneId: string;
     senderPersonaId: string | null;
     content: string;
+    kind?: 'chat' | 'director';
   }): Promise<RPMessage>;
   rpUpdateSceneMessage(id: string, content: string): Promise<void>;
   rpDeleteSceneMessage(id: string): Promise<void>;
@@ -321,7 +343,8 @@ export interface WickedAPI {
   rpGrokComplete(
     apiKey: string,
     model: string,
-    messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
+    messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
+    options?: { temperature?: number; presencePenalty?: number; frequencyPenalty?: number }
   ): Promise<string>;
 
   // Shell

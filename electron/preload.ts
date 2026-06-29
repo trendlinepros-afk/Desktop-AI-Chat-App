@@ -93,6 +93,11 @@ const api: WickedAPI = {
   rpCreatePersona: (data) => ipcRenderer.invoke('rp:createPersona', data),
   rpUpdatePersona: (id, patch) => ipcRenderer.invoke('rp:updatePersona', id, patch),
   rpDeletePersona: (id) => ipcRenderer.invoke('rp:deletePersona', id),
+  rpGetPersonaImages: (personaId) => ipcRenderer.invoke('rp:getPersonaImages', personaId),
+  rpAddPersonaImage: (personaId, dataUrl) =>
+    ipcRenderer.invoke('rp:addPersonaImage', personaId, dataUrl),
+  rpDeletePersonaImage: (imageId) => ipcRenderer.invoke('rp:deletePersonaImage', imageId),
+  rpRotateDueAvatars: () => ipcRenderer.invoke('rp:rotateDueAvatars'),
   rpGetScenes: () => ipcRenderer.invoke('rp:getScenes'),
   rpCreateScene: (name, personaIds) => ipcRenderer.invoke('rp:createScene', name, personaIds),
   rpRenameScene: (id, name) => ipcRenderer.invoke('rp:renameScene', id, name),
@@ -118,8 +123,8 @@ const api: WickedAPI = {
   rpOpenMemoryFolder: () => ipcRenderer.invoke('rp:openMemoryFolder'),
   rpSyncProfiles: () => ipcRenderer.invoke('rp:syncProfiles'),
   rpSyncFromVault: (sceneId) => ipcRenderer.invoke('rp:syncFromVault', sceneId),
-  rpGrokComplete: (apiKey, model, messages) =>
-    ipcRenderer.invoke('rp:grokComplete', apiKey, model, messages),
+  rpGrokComplete: (apiKey, model, messages, options) =>
+    ipcRenderer.invoke('rp:grokComplete', apiKey, model, messages, options),
 
   // Shell
   openExternal: (p) => ipcRenderer.invoke('shell:openExternal', p),

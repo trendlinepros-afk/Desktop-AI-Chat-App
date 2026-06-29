@@ -3,6 +3,8 @@ import { useRPStore } from '../../store/rpStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
 import { AddPersonModal } from './AddPersonModal';
+import { GuideModal } from './GuideModal';
+import { Avatar } from './Avatar';
 import type { RPMessage, RPPersona } from '../../types';
 
 export function RPChatWindow({
@@ -38,6 +40,7 @@ export function RPChatWindow({
 
   const [input, setInput] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [titleEditing, setTitleEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -148,6 +151,13 @@ export function RPChatWindow({
           🔄 Sync
         </button>
         <button
+          onClick={() => setGuideOpen(true)}
+          title="Guide the story — give an out-of-character direction"
+          className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
+        >
+          🎬 Guide
+        </button>
+        <button
           onClick={() => onEditScene(scene.id)}
           title="Add or remove characters"
           className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
@@ -196,6 +206,17 @@ export function RPChatWindow({
           </p>
         )}
         {messages.map((m, i) => {
+          if (m.kind === 'director') {
+            return (
+              <DirectorNote
+                key={m.id}
+                text={m.content}
+                onDelete={() => {
+                  if (confirm('Delete this director note?')) void deleteMessage(m.id);
+                }}
+              />
+            );
+          }
           const sender = byId(m.senderPersonaId);
           const mine = isMine(m);
           const isLast = i === messages.length - 1;
@@ -205,6 +226,7 @@ export function RPChatWindow({
               text={m.content}
               mine={mine}
               avatar={sender?.avatar ?? '🧑'}
+              avatarImage={sender?.avatarImage || undefined}
               name={sender?.name ?? 'You'}
               canRegen={isLast && !mine && !generating}
               onEdit={(text) => editMessage(m.id, text)}
@@ -212,6 +234,7 @@ export function RPChatWindow({
                 if (confirm('Delete this message?')) void deleteMessage(m.id);
               }}
               onRegen={() => regenerateLast()}
+              onGuide={() => setGuideOpen(true)}
             />
           );
         })}
@@ -220,6 +243,7 @@ export function RPChatWindow({
             text="…"
             mine={false}
             avatar={byId(speakingId)?.avatar ?? '🎭'}
+            avatarImage={byId(speakingId)?.avatarImage || undefined}
             name={byId(speakingId)?.name ?? ''}
             readOnly
           />
@@ -298,6 +322,25 @@ export function RPChatWindow({
       {addOpen && (
         <AddPersonModal onClose={() => setAddOpen(false)} onCreateNew={onCreatePersona} />
       )}
+      {guideOpen && <GuideModal onClose={() => setGuideOpen(false)} />}
+    </div>
+  );
+}
+
+// A centered, out-of-character director steer in the transcript.
+function DirectorNote({ text, onDelete }: { text: string; onDelete: () => void }) {
+  return (
+    <div className="group flex justify-center">
+      <div className="max-w-[80%] rounded-lg border border-accent/40 bg-accent/5 px-3 py-1.5 text-center text-xs italic text-accent">
+        🎬 {text}
+        <button
+          onClick={onDelete}
+          className="ml-2 not-italic opacity-0 transition group-hover:opacity-100 hover:text-red-400"
+          title="Delete director note"
+        >
+          ✕
+        </button>
+      </div>
     </div>
   );
 }
@@ -322,22 +365,26 @@ function MessageRow({
   text,
   mine,
   avatar,
+  avatarImage,
   name,
   canRegen,
   readOnly,
   onEdit,
   onDelete,
   onRegen,
+  onGuide,
 }: {
   text: string;
   mine: boolean;
   avatar: string;
+  avatarImage?: string;
   name: string;
   canRegen?: boolean;
   readOnly?: boolean;
   onEdit?: (text: string) => void;
   onDelete?: () => void;
   onRegen?: () => void;
+  onGuide?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
@@ -353,7 +400,7 @@ function MessageRow({
 
   return (
     <div className={`group flex gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
-      {!mine && <span className="mt-1 text-lg leading-none">{avatar}</span>}
+      {!mine && <Avatar emoji={avatar} image={avatarImage} size={28} className="mt-1" />}
       <div className="max-w-[75%]">
         {!mine && <div className="mb-0.5 text-xs text-text-muted">{name}</div>}
         {editing ? (
@@ -403,6 +450,15 @@ function MessageRow({
             {canRegen && onRegen && (
               <button onClick={onRegen} className="hover:text-text-primary" title="Regenerate">
                 🔄 Redo
+              </button>
+            )}
+            {onGuide && (
+              <button
+                onClick={onGuide}
+                className="hover:text-text-primary"
+                title="Guide the story from here"
+              >
+                🎬 Direct
               </button>
             )}
             {onDelete && (

@@ -1,4 +1,5 @@
 import { useRPStore } from '../../store/rpStore';
+import { Avatar } from './Avatar';
 
 export function RPSidebar({
   onNewScene,
@@ -72,7 +73,7 @@ export function RPSidebar({
             onClick={() => onEditPersona(p.id)}
             className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-hover"
           >
-            <span className="text-lg leading-none">{p.avatar}</span>
+            <Avatar emoji={p.avatar} image={p.avatarImage || undefined} size={22} />
             <span className="flex-1 truncate">{p.name}</span>
             {p.isMe && (
               <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-semibold text-accent">

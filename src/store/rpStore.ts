@@ -28,13 +28,19 @@ interface RPState {
     name: string;
     description: string;
     avatar?: string;
+    avatarImage?: string;
     greeting?: string;
     model: string;
     isMe?: boolean;
   }) => Promise<RPPersona>;
   updatePersona: (
     id: string,
-    patch: Partial<Pick<RPPersona, 'name' | 'description' | 'avatar' | 'greeting' | 'model' | 'isMe'>>
+    patch: Partial<
+      Pick<
+        RPPersona,
+        'name' | 'description' | 'avatar' | 'avatarImage' | 'greeting' | 'model' | 'isMe' | 'avatarRotateDaily'
+      >
+    >
   ) => Promise<void>;
   deletePersona: (id: string) => Promise<void>;
 
@@ -47,6 +53,7 @@ interface RPState {
   clearScene: (id: string) => Promise<void>;
 
   sendUser: (text: string) => Promise<void>;
+  guideScene: (text: string) => Promise<void>;
   haveSpeak: (personaId: string) => Promise<void>;
   stop: () => void;
   summarizeNow: (sceneId: string) => Promise<void>;
@@ -189,6 +196,21 @@ export const useRPStore = create<RPState>((set, get) => ({
       content: text.trim(),
     });
     set({ messages: [...get().messages, userMsg] });
+    await runAuto(get, set, sceneId, text.trim());
+  },
+
+  // An out-of-character "director" steer (mood change, plot direction). It's
+  // recorded as a director note and the characters then continue, following it.
+  guideScene: async (text) => {
+    const sceneId = get().activeSceneId;
+    if (!sceneId || !text.trim() || get().generating) return;
+    const msg = await window.polyglot.rpSaveSceneMessage({
+      sceneId,
+      senderPersonaId: null,
+      content: text.trim(),
+      kind: 'director',
+    });
+    set({ messages: [...get().messages, msg] });
     await runAuto(get, set, sceneId, text.trim());
   },
 
@@ -394,7 +416,12 @@ async function generateFor(
     `person wrapped in *asterisks*, and write spoken words as plain text. Every reply must include ` +
     `at least one *narration* of what ${persona.name} is doing or how the scene looks, not just ` +
     `speech.\nFor example:\n*Beth walks into the room, confident, wearing a pink shirt and skirt, ` +
-    `and smiles* Hello Adam, how are you?`;
+    `and smiles* Hello Adam, how are you?\n\n` +
+    `Crucially, PROGRESS the story every turn. Do not repeat, echo, or paraphrase what you or ` +
+    `another character already said. React to the latest message, then add something NEW — a fresh ` +
+    `action, decision, question, revelation, or change in the scene that moves things forward. ` +
+    `Never stall, agree-and-restate, or loop back to earlier points. Keep replies fairly short ` +
+    `(1-4 sentences) to keep momentum.`;
   if (others.length > 0) {
     system +=
       `\n\nThis is a live group conversation. Other characters present: ` +
@@ -421,7 +448,12 @@ async function generateFor(
   const history = get().messages.slice(-MAX_HISTORY);
   const turns: RPTurn[] = [{ role: 'system', content: system }];
   for (const m of history) {
-    if (m.senderPersonaId === persona.id) {
+    if (m.kind === 'director') {
+      turns.push({
+        role: 'user',
+        content: `[DIRECTOR — out-of-character instruction, you MUST follow this to steer the scene]: ${m.content}`,
+      });
+    } else if (m.senderPersonaId === persona.id) {
       turns.push({ role: 'assistant', content: m.content });
     } else {
       turns.push({ role: 'user', content: `${speakerName(get, m)}: ${m.content}` });
@@ -431,7 +463,13 @@ async function generateFor(
 
   let text = '';
   try {
-    text = await grokComplete(settings.grokApiKey, persona.model, turns);
+    // Higher temperature + repetition penalties keep characters from echoing each
+    // other and looping — they push the model toward fresh, progressing replies.
+    text = await grokComplete(settings.grokApiKey, persona.model, turns, {
+      temperature: 0.95,
+      presencePenalty: 0.6,
+      frequencyPenalty: 0.5,
+    });
   } catch (err) {
     text = `⚠️ ${(err as Error).message}`;
     toast((err as Error).message, 'error');

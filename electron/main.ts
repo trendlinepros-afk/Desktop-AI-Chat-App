@@ -342,6 +342,14 @@ function registerIpc(): void {
     db.rpDeletePersona(id);
     safeVault(() => rpMemory.deletePersonaProfile(id), undefined);
   });
+  ipcMain.handle('rp:getPersonaImages', (_e, personaId: string) =>
+    db.rpGetPersonaImages(personaId)
+  );
+  ipcMain.handle('rp:addPersonaImage', (_e, personaId: string, dataUrl: string) =>
+    db.rpAddPersonaImage(personaId, dataUrl)
+  );
+  ipcMain.handle('rp:deletePersonaImage', (_e, imageId: string) => db.rpDeletePersonaImage(imageId));
+  ipcMain.handle('rp:rotateDueAvatars', () => db.rpRotateDueAvatars());
   ipcMain.handle('rp:syncProfiles', () =>
     safeVault(() => rpMemory.syncPersonaProfiles(db.rpGetPersonas()), undefined)
   );
@@ -422,9 +430,15 @@ function registerIpc(): void {
       _e,
       apiKey: string,
       model: string,
-      messages: { role: string; content: string }[]
+      messages: { role: string; content: string }[],
+      options?: { temperature?: number; presencePenalty?: number; frequencyPenalty?: number }
     ) => {
       if (!apiKey) throw new Error('No Grok API key set. Add one in RP Settings.');
+      const body: Record<string, unknown> = { model, messages };
+      if (options?.temperature !== undefined) body.temperature = options.temperature;
+      if (options?.presencePenalty !== undefined) body.presence_penalty = options.presencePenalty;
+      if (options?.frequencyPenalty !== undefined)
+        body.frequency_penalty = options.frequencyPenalty;
       let res: Response;
       try {
         res = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -433,7 +447,7 @@ function registerIpc(): void {
             'content-type': 'application/json',
             Authorization: `Bearer ${apiKey}`,
           },
-          body: JSON.stringify({ model, messages }),
+          body: JSON.stringify(body),
         });
       } catch (err) {
         throw new Error(`Couldn't reach the Grok API: ${(err as Error).message}`);

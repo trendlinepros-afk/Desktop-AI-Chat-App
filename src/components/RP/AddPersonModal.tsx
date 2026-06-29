@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useRPStore } from '../../store/rpStore';
+import { Avatar } from './Avatar';
 
 // Quick "add another person to the conversation" picker, opened from the chat
 // header. Adding a character drops them into the active scene immediately and
@@ -53,7 +54,7 @@ export function AddPersonModal({
                 onClick={() => add(p.id)}
                 className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-hover"
               >
-                <span className="text-lg leading-none">{p.avatar}</span>
+                <Avatar emoji={p.avatar} image={p.avatarImage || undefined} size={22} />
                 <span className="flex-1 truncate">{p.name}</span>
                 <span className="text-xs text-accent">Add →</span>
               </button>
