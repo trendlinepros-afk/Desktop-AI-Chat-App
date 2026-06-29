@@ -224,6 +224,9 @@ export interface WickedAPI {
   checkForUpdates(): Promise<UpdateCheckResult>;
   installUpdate(): Promise<string>;
 
+  // Model discovery (OpenAI/DeepSeek listed in the main process to avoid CORS)
+  listOpenAICompatModels(baseUrl: string, apiKey: string): Promise<string[]>;
+
   // Shell
   openExternal(path: string): Promise<void>;
 }

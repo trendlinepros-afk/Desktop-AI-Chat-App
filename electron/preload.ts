@@ -83,6 +83,10 @@ const api: WickedAPI = {
   checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
 
+  // Model discovery (OpenAI/DeepSeek listed via main to avoid CORS)
+  listOpenAICompatModels: (baseUrl, apiKey) =>
+    ipcRenderer.invoke('models:listOpenAICompat', baseUrl, apiKey),
+
   // Shell
   openExternal: (p) => ipcRenderer.invoke('shell:openExternal', p),
 };

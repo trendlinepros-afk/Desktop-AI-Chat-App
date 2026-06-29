@@ -305,6 +305,19 @@ function registerIpc(): void {
     });
   });
 
+  // List models from an OpenAI-compatible API (OpenAI, DeepSeek). Done in the
+  // main process because these endpoints don't send CORS headers, so a
+  // renderer-side fetch would be blocked (unlike Gemini, which allows it).
+  ipcMain.handle('models:listOpenAICompat', async (_e, baseUrl: string, apiKey: string) => {
+    if (!apiKey) return [] as string[];
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) throw new Error(`Model list failed (${res.status})`);
+    const data = (await res.json()) as { data?: { id?: string }[] };
+    return (data.data ?? []).map((m) => m.id).filter((id): id is string => !!id);
+  });
+
   // ----- Shell -----
   ipcMain.handle('shell:openExternal', (_e, p: string) => {
     // Treat as a file path inside the vault when relative.

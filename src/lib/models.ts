@@ -1,4 +1,3 @@
-import OpenAI from 'openai';
 import type { Provider, Settings } from '../types';
 import type { ModelVersion } from '../components/ModelSelector/modelConfig';
 
@@ -63,17 +62,13 @@ function geminiImageModels(models: GeminiModel[]): ModelVersion[] {
   return out;
 }
 
-// OpenAI-compatible (OpenAI + DeepSeek) — GET /v1/models, then keep the chat
-// models and drop embeddings / audio / image / moderation / legacy completions.
-async function listOpenAICompatModels(
-  apiKey: string,
-  baseURL: string | undefined
-): Promise<ModelVersion[]> {
-  const client = new OpenAI({ apiKey, baseURL, dangerouslyAllowBrowser: true });
-  const res = await client.models.list();
+// OpenAI-compatible (OpenAI + DeepSeek) — GET /v1/models via the main process
+// (renderer fetches are CORS-blocked for these hosts). Keep the chat models and
+// drop embeddings / audio / image / moderation / legacy completions.
+async function listOpenAICompatModels(baseUrl: string, apiKey: string): Promise<ModelVersion[]> {
+  const ids = await window.polyglot.listOpenAICompatModels(baseUrl, apiKey);
   const out: ModelVersion[] = [];
-  for (const m of res.data) {
-    const id = m.id;
+  for (const id of ids) {
     if (
       /embed|whisper|tts|dall-e|audio|image|realtime|moderation|transcrib|search|similarity|\bedit\b|babbage|davinci|ada|curie|instruct/i.test(
         id
@@ -93,9 +88,9 @@ export async function listChatModels(provider: Provider, settings: Settings): Pr
     case 'gemini':
       return geminiChatModels(await fetchGeminiModels(settings.geminiApiKey));
     case 'openai':
-      return listOpenAICompatModels(settings.openaiApiKey, undefined);
+      return listOpenAICompatModels('https://api.openai.com/v1', settings.openaiApiKey);
     case 'deepseek':
-      return listOpenAICompatModels(settings.deepseekApiKey, 'https://api.deepseek.com');
+      return listOpenAICompatModels('https://api.deepseek.com/v1', settings.deepseekApiKey);
     case 'ollama':
       return [];
   }
