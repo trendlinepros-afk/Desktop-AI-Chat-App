@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react';
 import type { Chat } from '../../types';
 import { useChatStore } from '../../store/chatStore';
 import { Message } from './Message';
+import { ImageOfferBubble } from './ImageOfferBubble';
 
 export function MessageList({ chat }: { chat: Chat }) {
   const messages = useChatStore((s) => s.messages);
+  const offer = useChatStore((s) => s.pendingImageOffer[chat.id]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -14,7 +16,7 @@ export function MessageList({ chat }: { chat: Chat }) {
     if (!el) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200;
     if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, offer]);
 
   const visible = messages.filter((m) => m.role !== 'system');
 
@@ -28,6 +30,7 @@ export function MessageList({ chat }: { chat: Chat }) {
         ) : (
           visible.map((m) => <Message key={m.id} message={m} chat={chat} />)
         )}
+        <ImageOfferBubble chat={chat} />
         <div ref={bottomRef} />
       </div>
     </div>

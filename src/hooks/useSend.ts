@@ -7,6 +7,7 @@ import { useUIStore } from '../store/uiStore';
 import { useChat, generateImage, completeText } from './useChat';
 import { useVaultSearch } from './useVaultSearch';
 import { useLinkedContext } from './useLinkedContext';
+import { isImageRequest } from '../lib/suggestModel';
 
 // Cap how much raw chat history we send each turn — bounds cost and avoids
 // context-window overflow on long chats. System/context messages are added
@@ -39,7 +40,6 @@ export function useSend() {
   const addMessage = useChatStore((s) => s.addMessage);
   const updateLastAssistant = useChatStore((s) => s.updateLastAssistant);
   const renameChat = useChatStore((s) => s.renameChat);
-  const imageGenMode = useChatStore((s) => s.imageGenMode);
   const brainEnabled = useChatStore((s) => s.brainEnabled);
   const setActiveContext = useBrainStore((s) => s.setActiveContext);
   const loadNotes = useBrainStore((s) => s.loadNotes);
@@ -156,35 +156,52 @@ export function useSend() {
     [addMessage, updateLastAssistant, sendMessage, settings, toast, renameChat, loadNotes]
   );
 
+  // Generate an image (Imagen :predict) and post it as an assistant message;
+  // surface failures as an in-chat assistant message too.
+  const runImageGen = useCallback(
+    async (chat: Chat, promptText: string) => {
+      const model = chat.modelVersion.startsWith('imagen') ? chat.modelVersion : 'imagen-3.0-generate-002';
+      try {
+        const dataUrl = await generateImage(settings.geminiApiKey, model, promptText);
+        const content: ContentPart[] = [{ type: 'image_url', image_url: { url: dataUrl } }];
+        addMessage({ ...makeMessage(chat.id, 'assistant', content), provider: 'gemini', modelVersion: model });
+        await window.polyglot.saveMessage({ chatId: chat.id, role: 'assistant', content, provider: 'gemini', modelVersion: model });
+      } catch (err) {
+        const msg = (err as Error).message || 'Image generation failed';
+        const content: ContentPart[] = [{ type: 'text', text: `⚠️ Image generation failed: ${msg}` }];
+        addMessage({ ...makeMessage(chat.id, 'assistant', content), provider: 'gemini', modelVersion: model });
+        await window.polyglot.saveMessage({ chatId: chat.id, role: 'assistant', content, provider: 'gemini', modelVersion: model });
+        toast(msg, 'error');
+      }
+      await useChatStore.getState().reloadMessages(chat.id);
+    },
+    [settings.geminiApiKey, addMessage, toast]
+  );
+
   const send = useCallback(
     async (chat: Chat, parts: ContentPart[]) => {
       const userText = parts.find((p) => p.type === 'text')?.text ?? '';
+      const store = useChatStore.getState();
 
       const userMsg = makeMessage(chat.id, 'user', parts);
       addMessage(userMsg);
       await window.polyglot.saveMessage({ chatId: chat.id, role: 'user', content: parts });
 
-      // Image generation branch.
-      if (imageGenMode[chat.id] && chat.provider === 'gemini') {
-        try {
-          const dataUrl = await generateImage(settings.geminiApiKey, chat.modelVersion, userText);
-          const content: ContentPart[] = [{ type: 'image_url', image_url: { url: dataUrl } }];
-          addMessage({
-            ...makeMessage(chat.id, 'assistant', content),
-            provider: chat.provider,
-            modelVersion: chat.modelVersion,
-          });
-          await window.polyglot.saveMessage({
-            chatId: chat.id,
-            role: 'assistant',
-            content,
-            provider: chat.provider,
-            modelVersion: chat.modelVersion,
-          });
-          await useChatStore.getState().reloadMessages(chat.id);
-        } catch (err) {
-          toast(`Image generation failed: ${(err as Error).message}`, 'error');
-        }
+      // Read image mode from live state (a stale snapshot was sending image
+      // requests through the text endpoint and 404ing on Imagen).
+      const imageMode =
+        chat.provider === 'gemini' &&
+        (chat.modelVersion.startsWith('imagen') || (store.imageGenMode[chat.id] ?? false));
+
+      if (imageMode) {
+        await runImageGen(chat, userText);
+        return;
+      }
+
+      // If it reads like an image request, offer to generate it (in-chat Yes/No)
+      // rather than replying with a text description.
+      if (userText.trim() && isImageRequest(userText)) {
+        store.setImageOffer(chat.id, userText);
         return;
       }
 
@@ -193,7 +210,7 @@ export function useSend() {
       const assembled = [...context, ...trimHistory(history)];
       await streamReply(chat, assembled, userText.trim() ? userText : undefined);
     },
-    [addMessage, imageGenMode, settings, toast, messages, buildContext, streamReply]
+    [addMessage, messages, buildContext, streamReply, runImageGen]
   );
 
   // Re-run the model against the current history (which must end with a user
@@ -209,5 +226,27 @@ export function useSend() {
     [buildContext, streamReply]
   );
 
-  return { send, regenerate, stop, isStreaming };
+  // Accept an in-chat image offer → switch to Imagen and generate.
+  const confirmImageOffer = useCallback(
+    async (chat: Chat, prompt: string) => {
+      const store = useChatStore.getState();
+      store.setImageOffer(chat.id, null);
+      const model = 'imagen-3.0-generate-002';
+      await store.setChatModel(chat.id, 'gemini', model);
+      store.setImageGen(chat.id, true);
+      await runImageGen({ ...chat, provider: 'gemini', modelVersion: model }, prompt);
+    },
+    [runImageGen]
+  );
+
+  // Decline → reply with a normal text answer to the prompt instead.
+  const declineImageOffer = useCallback(
+    async (chat: Chat) => {
+      useChatStore.getState().setImageOffer(chat.id, null);
+      await regenerate(chat);
+    },
+    [regenerate]
+  );
+
+  return { send, regenerate, confirmImageOffer, declineImageOffer, stop, isStreaming };
 }

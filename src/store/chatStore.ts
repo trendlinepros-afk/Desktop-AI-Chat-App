@@ -26,6 +26,10 @@ interface ChatState {
 
   toggleBrain: (chatId: string) => void;
   setImageGen: (chatId: string, on: boolean) => void;
+
+  // Pending "do you want to generate an image?" offer, keyed by chatId.
+  pendingImageOffer: Record<string, string>;
+  setImageOffer: (chatId: string, prompt: string | null) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -130,4 +134,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setImageGen: (chatId, on) =>
     set({ imageGenMode: { ...get().imageGenMode, [chatId]: on } }),
+
+  pendingImageOffer: {},
+  setImageOffer: (chatId, prompt) => {
+    const next = { ...get().pendingImageOffer };
+    if (prompt) next[chatId] = prompt;
+    else delete next[chatId];
+    set({ pendingImageOffer: next });
+  },
 }));
