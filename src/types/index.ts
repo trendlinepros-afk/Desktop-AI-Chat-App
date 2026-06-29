@@ -147,6 +147,7 @@ export interface Settings {
   grokModel: string; // default Grok model for new personas
   rpMemoryEnabled: boolean; // periodically summarize RP chats into memory files
   rpSummarizeEvery: number; // summarize after this many new messages
+  rpVaultPath: string; // a SEPARATE Obsidian vault folder used only for RP memory
 }
 
 export const VAULT_CATEGORIES = [

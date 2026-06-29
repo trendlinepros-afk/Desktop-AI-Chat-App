@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS: Settings = {
   grokModel: 'grok-3',
   rpMemoryEnabled: true,
   rpSummarizeEvery: 20,
+  rpVaultPath: '',
 };
 
 export function initDb(): void {
@@ -625,6 +626,7 @@ export function getSettings(): Settings {
     rpSummarizeEvery: map.has('rpSummarizeEvery')
       ? Number(map.get('rpSummarizeEvery'))
       : DEFAULT_SETTINGS.rpSummarizeEvery,
+    rpVaultPath: map.get('rpVaultPath') ?? DEFAULT_SETTINGS.rpVaultPath,
   };
 }
 
@@ -644,6 +646,11 @@ export function saveSettings(partial: Partial<Settings>): void {
 
 export function getVaultPath(): string {
   return getSettings().vaultPath;
+}
+
+// The separate Obsidian vault used only for Role-Play memory.
+export function getRpVaultPath(): string {
+  return getSettings().rpVaultPath;
 }
 
 // Raw key/value access for settings that aren't part of the typed Settings shape

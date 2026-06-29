@@ -15,6 +15,7 @@ export function RPChatWindow({ onEdit }: { onEdit: (id: string) => void }) {
   const summarizeNow = useRPStore((s) => s.summarizeNow);
   const clearConversation = useRPStore((s) => s.clearConversation);
   const grokKey = useSettingsStore((s) => s.settings.grokApiKey);
+  const rpVaultPath = useSettingsStore((s) => s.settings.rpVaultPath);
   const toast = useUIStore((s) => s.toast);
 
   const [input, setInput] = useState('');
@@ -38,6 +39,12 @@ export function RPChatWindow({ onEdit }: { onEdit: (id: string) => void }) {
         {!grokKey && (
           <p className="mt-3 text-xs text-brain">
             Tip: add your Grok (xAI) API key in ⚙️ RP Settings to start chatting.
+          </p>
+        )}
+        {!rpVaultPath && (
+          <p className="mt-1 text-xs text-brain">
+            Tip: in ⚙️ RP Settings, choose a separate Obsidian vault folder to store this side's
+            memory.
           </p>
         )}
       </div>

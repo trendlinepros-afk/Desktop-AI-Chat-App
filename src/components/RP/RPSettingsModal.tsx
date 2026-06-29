@@ -14,6 +14,7 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
   const [grokModel, setGrokModel] = useState(settings.grokModel);
   const [rpMemoryEnabled, setRpMemoryEnabled] = useState(settings.rpMemoryEnabled);
   const [rpSummarizeEvery, setRpSummarizeEvery] = useState(settings.rpSummarizeEvery);
+  const [rpVaultPath, setRpVaultPath] = useState(settings.rpVaultPath);
   const [showKey, setShowKey] = useState(false);
   const [models, setModels] = useState<string[]>(GROK_MODELS);
 
@@ -31,8 +32,13 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
     toast(`Found ${list.length} Grok model(s)`, 'success');
   };
 
+  const pickVault = async () => {
+    const path = await window.polyglot.openVaultFolderDialog();
+    if (path) setRpVaultPath(path);
+  };
+
   const onSave = async () => {
-    await save({ grokApiKey, grokModel, rpMemoryEnabled, rpSummarizeEvery });
+    await save({ grokApiKey, grokModel, rpMemoryEnabled, rpSummarizeEvery, rpVaultPath });
     toast('RP settings saved', 'success');
     onClose();
   };
@@ -101,6 +107,45 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
                 Refresh
               </button>
             </div>
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Memory vault (Obsidian)</h3>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={rpVaultPath || 'No RP vault chosen — using app storage'}
+                className="flex-1 truncate rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-text-muted"
+              />
+              <button
+                onClick={pickVault}
+                className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent/90"
+              >
+                {rpVaultPath ? 'Change…' : 'Choose vault folder'}
+              </button>
+              {rpVaultPath && (
+                <button
+                  onClick={() => setRpVaultPath('')}
+                  title="Stop using the Obsidian vault for RP memory"
+                  className="shrink-0 rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              Pick a <strong>separate Obsidian vault</strong> (create a brand-new one in Obsidian
+              first, then select its folder here). RP memory is written as markdown into a{' '}
+              <code>WickedRP/</code> folder inside it, kept entirely apart from WICKED's main Brain
+              vault. New to Obsidian? Get it at{' '}
+              <button
+                className="text-accent underline"
+                onClick={() => window.polyglot.openExternal('https://obsidian.md')}
+              >
+                obsidian.md
+              </button>
+              .
+            </p>
           </div>
 
           <div>

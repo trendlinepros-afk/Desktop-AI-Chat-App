@@ -23,6 +23,7 @@ const EMPTY: Settings = {
   grokModel: 'grok-3',
   rpMemoryEnabled: true,
   rpSummarizeEvery: 20,
+  rpVaultPath: '',
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

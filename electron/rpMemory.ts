@@ -1,16 +1,21 @@
 import { app, shell } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { getRpVaultPath } from './db';
 
-// Role-Play memory is stored in its OWN folder under userData, deliberately kept
-// separate from the Obsidian Brain vault (WickedBrain/). Nothing the RP side
-// produces ever touches the main app's memory. One markdown file per persona
-// accumulates dated summaries so a long relationship survives history trimming.
+// Role-Play memory lives in a dedicated Obsidian vault the user picks for the RP
+// side — deliberately separate from the main app's Brain vault (WickedBrain/).
+// Files are written into a WickedRP/ subfolder of that vault so they're browsable
+// and editable in Obsidian. If no RP vault is chosen yet, we fall back to a
+// folder under userData so memory still works out of the box. One markdown file
+// per persona accumulates dated summaries so a long relationship survives
+// history trimming.
 
 const RP_SUBDIR = 'WickedRP';
 
 function memoryRoot(): string {
-  const root = path.join(app.getPath('userData'), RP_SUBDIR);
+  const base = getRpVaultPath() || app.getPath('userData');
+  const root = path.join(base, RP_SUBDIR);
   if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true });
   return root;
 }
