@@ -158,6 +158,7 @@ export interface Settings {
   rpMemoryEnabled: boolean; // periodically summarize RP chats into memory files
   rpSummarizeEvery: number; // summarize after this many new messages
   rpVaultPath: string; // a SEPARATE Obsidian vault folder used only for RP memory
+  rpAutoReplyLimit: number; // max AI replies in a row before pausing for you (caps API use)
 }
 
 export const VAULT_CATEGORIES = [

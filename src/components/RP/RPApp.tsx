@@ -71,7 +71,10 @@ export function RPApp() {
           onNewPersona={() => setPersonaEditor({ open: true, id: null })}
           onEditPersona={(id) => setPersonaEditor({ open: true, id })}
         />
-        <RPChatWindow onEditScene={(id) => setSceneEditor({ open: true, id })} />
+        <RPChatWindow
+          onEditScene={(id) => setSceneEditor({ open: true, id })}
+          onCreatePersona={() => setPersonaEditor({ open: true, id: null })}
+        />
       </div>
 
       {personaEditor.open && (

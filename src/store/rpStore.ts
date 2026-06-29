@@ -41,6 +41,7 @@ interface RPState {
   renameScene: (id: string, name: string) => Promise<void>;
   deleteScene: (id: string) => Promise<void>;
   setMembers: (sceneId: string, personaIds: string[]) => Promise<void>;
+  addPersonToScene: (personaId: string) => Promise<void>;
   clearScene: (id: string) => Promise<void>;
 
   sendUser: (text: string) => Promise<void>;
@@ -141,6 +142,25 @@ export const useRPStore = create<RPState>((set, get) => ({
     });
   },
 
+  addPersonToScene: async (personaId) => {
+    const sceneId = get().activeSceneId;
+    const persona = get().personaById(personaId);
+    if (!sceneId || !persona) return;
+    if (get().memberIds.includes(personaId)) return;
+    const members = [...get().memberIds, personaId];
+    await window.polyglot.rpSetSceneMembers(sceneId, members);
+    set({ memberIds: members });
+    // A new arrival "enters" with a single line — but only if it's a character
+    // (not your own "me" persona) and nothing is already generating.
+    if (!persona.isMe && !get().generating) {
+      cancelled = false;
+      set({ generating: true });
+      await generateFor(get, set, sceneId, persona, `*${persona.name} joins the conversation.*`);
+      set({ generating: false, speakingId: null });
+      await maybeSummarize(get);
+    }
+  },
+
   sendUser: async (text) => {
     const sceneId = get().activeSceneId;
     if (!sceneId || !text.trim() || get().generating) return;
@@ -151,7 +171,7 @@ export const useRPStore = create<RPState>((set, get) => ({
       content: text.trim(),
     });
     set({ messages: [...get().messages, userMsg] });
-    await respondRound(get, set, sceneId);
+    await runAuto(get, set, sceneId, text.trim());
   },
 
   haveSpeak: async (personaId) => {
@@ -218,25 +238,75 @@ function speakerName(get: Get, m: RPMessage): string {
   return get().personaById(m.senderPersonaId)?.name ?? 'Someone';
 }
 
-// Run one round: every non-"me" participant replies once, in order, each seeing
-// the replies that came before it this turn.
-async function respondRound(get: Get, set: Set, sceneId: string): Promise<void> {
-  const aiMembers = get()
+const aiMembersOf = (get: Get): RPPersona[] =>
+  get()
     .memberIds.map((id) => get().personaById(id))
     .filter((p): p is RPPersona => !!p && !p.isMe);
+
+// The character whose name appears in `text` (used to route who replies next).
+function findAddressed(text: string, candidates: RPPersona[]): RPPersona | undefined {
+  const lower = text.toLowerCase();
+  return candidates.find((p) => lower.includes(p.name.toLowerCase()));
+}
+
+// Heuristic: does this reply put a question to the USER (not another character)?
+// If so we stop the auto-banter and wait — the other characters shouldn't answer
+// on your behalf.
+function addressedToUser(text: string, me: RPPersona | undefined, others: RPPersona[]): boolean {
+  if (!/\?/.test(text)) return false;
+  const lower = text.toLowerCase();
+  const mentionsOther = others.some((p) => lower.includes(p.name.toLowerCase()));
+  const mentionsMe = !!me && lower.includes(me.name.toLowerCase());
+  if (mentionsOther && !mentionsMe) return false; // the question is for another character
+  return true; // a question, aimed at you (by name, or with no other target)
+}
+
+// The driver for automatic replies. After you speak, characters reply one at a
+// time — addressing each other by name to build the story — until the safety
+// limit is hit, someone asks YOU a question, or you press Stop. A lone character
+// just answers once.
+async function runAuto(get: Get, set: Set, sceneId: string, userText: string): Promise<void> {
+  const aiMembers = aiMembersOf(get);
   if (aiMembers.length === 0) return;
+  const limit = Math.max(1, useSettingsStore.getState().settings.rpAutoReplyLimit);
+  const me = get().mePersona();
+
   cancelled = false;
   set({ generating: true });
-  for (const p of aiMembers) {
-    if (cancelled || get().activeSceneId !== sceneId) break;
-    await generateFor(get, set, sceneId, p);
+
+  // First responder: whoever you named, else the first character.
+  let next: RPPersona | undefined = findAddressed(userText, aiMembers) ?? aiMembers[0];
+  let count = 0;
+  while (next && count < limit && !cancelled && get().activeSceneId === sceneId) {
+    const speaker: RPPersona = next;
+    const reply = await generateFor(get, set, sceneId, speaker);
+    count++;
+    const others = aiMembers.filter((p) => p.id !== speaker.id);
+    if (others.length === 0) break; // solo character — no back-and-forth
+    if (addressedToUser(reply, me, others)) break; // they asked you something
+    // Continue: the character they named, else round-robin to the next one.
+    next = findAddressed(reply, others) ?? nextInOrder(aiMembers, speaker);
   }
+
   set({ generating: false, speakingId: null });
   await maybeSummarize(get);
 }
 
-// Build the prompt for one persona and append its reply to the scene.
-async function generateFor(get: Get, set: Set, sceneId: string, persona: RPPersona): Promise<void> {
+function nextInOrder(members: RPPersona[], current: RPPersona): RPPersona | undefined {
+  if (members.length < 2) return undefined;
+  const idx = members.findIndex((p) => p.id === current.id);
+  return members[(idx + 1) % members.length];
+}
+
+// Build the prompt for one persona, append its reply to the scene, return the
+// reply text. `nudge` injects a stage direction (e.g. a character entering).
+async function generateFor(
+  get: Get,
+  set: Set,
+  sceneId: string,
+  persona: RPPersona,
+  nudge?: string
+): Promise<string> {
   const settings = useSettingsStore.getState().settings;
   const toast = useUIStore.getState().toast;
   set({ speakingId: persona.id });
@@ -253,10 +323,13 @@ async function generateFor(get: Get, set: Set, sceneId: string, persona: RPPerso
     `Character:\n${persona.description.trim()}`;
   if (others.length > 0) {
     system +=
-      `\n\nThis is a group conversation. Other characters present: ` +
+      `\n\nThis is a live group conversation. Other characters present: ` +
       others.map((o) => o.name).join(', ') +
-      `. Reply ONLY as ${persona.name}, with a single message. Do not write, narrate, or ` +
-      `speak for the other characters or the user. Do not prefix your reply with your name.`;
+      `. Reply ONLY as ${persona.name}, with a single short message. Do not write, narrate, or ` +
+      `speak for anyone else. Do not prefix your reply with your name. You may speak to another ` +
+      `character by addressing them by name, or speak to ${me ? me.name : 'the user'} directly. ` +
+      `If you want ${me ? me.name : 'the user'}'s input, ask them a direct question by name; ` +
+      `otherwise keep the scene moving with the other characters.`;
   }
   if (me) {
     system += `\n\nYou are talking with ${me.name}${
@@ -280,6 +353,7 @@ async function generateFor(get: Get, set: Set, sceneId: string, persona: RPPerso
       turns.push({ role: 'user', content: `${speakerName(get, m)}: ${m.content}` });
     }
   }
+  if (nudge) turns.push({ role: 'user', content: nudge });
 
   let text = '';
   try {
@@ -295,6 +369,7 @@ async function generateFor(get: Get, set: Set, sceneId: string, persona: RPPerso
     content: text,
   });
   if (get().activeSceneId === sceneId) set({ messages: [...get().messages, msg] });
+  return text;
 }
 
 async function maybeSummarize(get: Get): Promise<void> {

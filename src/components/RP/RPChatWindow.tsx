@@ -2,9 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { useRPStore } from '../../store/rpStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
+import { AddPersonModal } from './AddPersonModal';
 import type { RPMessage, RPPersona } from '../../types';
 
-export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) => void }) {
+export function RPChatWindow({
+  onEditScene,
+  onCreatePersona,
+}: {
+  onEditScene: (sceneId: string) => void;
+  onCreatePersona: () => void;
+}) {
   const scenes = useRPStore((s) => s.scenes);
   const activeSceneId = useRPStore((s) => s.activeSceneId);
   const memberIds = useRPStore((s) => s.memberIds);
@@ -23,6 +30,7 @@ export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) =
   const toast = useUIStore((s) => s.toast);
 
   const [input, setInput] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scene = scenes.find((s) => s.id === activeSceneId) ?? null;
@@ -95,6 +103,13 @@ export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) =
           className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
         >
           👥 Cast
+        </button>
+        <button
+          onClick={() => setAddOpen(true)}
+          title="Add another person to the conversation"
+          className="rounded-md border border-accent/40 px-2 py-1 text-sm text-accent hover:bg-accent/10"
+        >
+          ＋ Add person
         </button>
         <button
           onClick={() => summarizeNow(scene.id)}
@@ -202,6 +217,10 @@ export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) =
           )}
         </div>
       </div>
+
+      {addOpen && (
+        <AddPersonModal onClose={() => setAddOpen(false)} onCreateNew={onCreatePersona} />
+      )}
     </div>
   );
 }

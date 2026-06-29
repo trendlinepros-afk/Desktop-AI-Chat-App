@@ -56,6 +56,7 @@ const DEFAULT_SETTINGS: Settings = {
   rpMemoryEnabled: true,
   rpSummarizeEvery: 20,
   rpVaultPath: '',
+  rpAutoReplyLimit: 3,
 };
 
 export function initDb(): void {
@@ -657,6 +658,9 @@ export function getSettings(): Settings {
       ? Number(map.get('rpSummarizeEvery'))
       : DEFAULT_SETTINGS.rpSummarizeEvery,
     rpVaultPath: map.get('rpVaultPath') ?? DEFAULT_SETTINGS.rpVaultPath,
+    rpAutoReplyLimit: map.has('rpAutoReplyLimit')
+      ? Number(map.get('rpAutoReplyLimit'))
+      : DEFAULT_SETTINGS.rpAutoReplyLimit,
   };
 }
 
