@@ -35,8 +35,9 @@ export const MODEL_CONFIG: Record<Provider, ProviderConfig> = {
       { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
     ],
     imageGenVersions: [
+      { id: 'gemini-2.0-flash-preview-image-generation', label: 'Gemini Flash (image)' },
+      { id: 'gemini-2.5-flash-image-preview', label: 'Nano Banana (2.5 Flash image)' },
       { id: 'imagen-3.0-generate-002', label: 'Imagen 3' },
-      { id: 'imagen-4.0-generate-001', label: 'Imagen 4' },
     ],
   },
   deepseek: {

@@ -211,45 +211,84 @@ async function streamGemini(apiKey: string, opts: SendOptions): Promise<string> 
   return full;
 }
 
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+// Image models to try, in order. Gemini-native image generation (generateContent
+// with an IMAGE modality) works on standard paid Gemini API keys; Imagen via
+// :predict is often not enabled, so it's the last resort.
+const IMAGE_FALLBACKS = [
+  'gemini-2.0-flash-preview-image-generation',
+  'gemini-2.5-flash-image-preview',
+  'imagen-3.0-generate-002',
+];
+
+async function errorDetail(res: Response): Promise<string> {
+  try {
+    const j = (await res.json()) as { error?: { message?: string } };
+    return j?.error?.message || '';
+  } catch {
+    return (await res.text().catch(() => '')) || '';
+  }
+}
+
+// Gemini-native image generation via generateContent (responseModalities: IMAGE).
+async function geminiGenerateImage(apiKey: string, model: string, prompt: string): Promise<string> {
+  const res = await fetch(`${GEMINI_BASE}/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+    }),
+  });
+  if (!res.ok) throw new Error(`${model} (${res.status}): ${(await errorDetail(res)).slice(0, 160)}`);
+  const data = (await res.json()) as {
+    candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[];
+  };
+  const part = data.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
+  if (!part?.inlineData?.data) throw new Error(`${model}: no image in response`);
+  return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+}
+
+// Imagen via the :predict endpoint.
+async function imagenPredict(apiKey: string, model: string, prompt: string): Promise<string> {
+  const res = await fetch(`${GEMINI_BASE}/${model}:predict`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+    body: JSON.stringify({ instances: [{ prompt }], parameters: { sampleCount: 1, aspectRatio: '1:1' } }),
+  });
+  if (!res.ok) throw new Error(`${model} (${res.status}): ${(await errorDetail(res)).slice(0, 160)}`);
+  const data = (await res.json()) as { predictions?: { bytesBase64Encoded?: string; mimeType?: string }[] };
+  const pred = data.predictions?.[0];
+  if (!pred?.bytesBase64Encoded) throw new Error(`${model}: no image returned`);
+  return `data:${pred.mimeType || 'image/png'};base64,${pred.bytesBase64Encoded}`;
+}
+
+// Try the preferred model, then fallbacks, until one returns an image. Returns
+// the data URL and the model that actually worked.
 export async function generateImage(
   apiKey: string,
-  modelVersion: string,
+  preferredModel: string,
   prompt: string
-): Promise<string> {
-  // Imagen on the Gemini API is the REST `:predict` endpoint — the JS SDK has
-  // no image-generation method, so call it directly.
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelVersion}:predict`;
-  const res = await withRetry(() =>
-    fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        instances: [{ prompt }],
-        parameters: { sampleCount: 1, aspectRatio: '1:1' },
-      }),
-    })
-  );
-  if (!res.ok) {
-    let detail = '';
-    try {
-      const err = (await res.json()) as { error?: { message?: string } };
-      detail = err?.error?.message || '';
-    } catch {
-      detail = await res.text().catch(() => '');
-    }
-    if (res.status === 400 || res.status === 403) {
-      throw new Error(
-        `Imagen request rejected (${res.status}). Image generation on the Gemini API requires a paid/billing-enabled key. ${detail}`.trim()
-      );
-    }
-    throw new Error(`Imagen error ${res.status}: ${detail.slice(0, 300)}`);
+): Promise<{ url: string; model: string }> {
+  const order: string[] = [];
+  for (const m of [preferredModel, ...IMAGE_FALLBACKS]) {
+    if (m && !order.includes(m)) order.push(m);
   }
-  const data = (await res.json()) as {
-    predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
-  };
-  const pred = data.predictions?.[0];
-  if (!pred?.bytesBase64Encoded) throw new Error('No image returned from Imagen');
-  return `data:${pred.mimeType || 'image/png'};base64,${pred.bytesBase64Encoded}`;
+  const errors: string[] = [];
+  for (const model of order) {
+    try {
+      const url = model.startsWith('imagen')
+        ? await imagenPredict(apiKey, model, prompt)
+        : await geminiGenerateImage(apiKey, model, prompt);
+      return { url, model };
+    } catch (err) {
+      errors.push((err as Error).message);
+    }
+  }
+  throw new Error(
+    `No image model available on this key. Tried: ${errors.join(' | ')}. Image generation needs a paid/billing-enabled Gemini key.`
+  );
 }
 
 function keyFor(provider: Provider, settings: Settings): string {

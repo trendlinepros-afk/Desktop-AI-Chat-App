@@ -160,17 +160,16 @@ export function useSend() {
   // surface failures as an in-chat assistant message too.
   const runImageGen = useCallback(
     async (chat: Chat, promptText: string) => {
-      const model = chat.modelVersion.startsWith('imagen') ? chat.modelVersion : 'imagen-3.0-generate-002';
       try {
-        const dataUrl = await generateImage(settings.geminiApiKey, model, promptText);
-        const content: ContentPart[] = [{ type: 'image_url', image_url: { url: dataUrl } }];
+        const { url, model } = await generateImage(settings.geminiApiKey, chat.modelVersion, promptText);
+        const content: ContentPart[] = [{ type: 'image_url', image_url: { url } }];
         addMessage({ ...makeMessage(chat.id, 'assistant', content), provider: 'gemini', modelVersion: model });
         await window.polyglot.saveMessage({ chatId: chat.id, role: 'assistant', content, provider: 'gemini', modelVersion: model });
       } catch (err) {
         const msg = (err as Error).message || 'Image generation failed';
         const content: ContentPart[] = [{ type: 'text', text: `⚠️ Image generation failed: ${msg}` }];
-        addMessage({ ...makeMessage(chat.id, 'assistant', content), provider: 'gemini', modelVersion: model });
-        await window.polyglot.saveMessage({ chatId: chat.id, role: 'assistant', content, provider: 'gemini', modelVersion: model });
+        addMessage({ ...makeMessage(chat.id, 'assistant', content), provider: 'gemini' });
+        await window.polyglot.saveMessage({ chatId: chat.id, role: 'assistant', content, provider: 'gemini' });
         toast(msg, 'error');
       }
       await useChatStore.getState().reloadMessages(chat.id);
@@ -231,7 +230,7 @@ export function useSend() {
     async (chat: Chat, prompt: string) => {
       const store = useChatStore.getState();
       store.setImageOffer(chat.id, null);
-      const model = 'imagen-3.0-generate-002';
+      const model = 'gemini-2.0-flash-preview-image-generation';
       await store.setChatModel(chat.id, 'gemini', model);
       store.setImageGen(chat.id, true);
       await runImageGen({ ...chat, provider: 'gemini', modelVersion: model }, prompt);
