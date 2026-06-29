@@ -14,6 +14,7 @@ interface RPState {
   scenes: RPScene[];
   activeSceneId: string | null;
   memberIds: string[]; // personas participating in the active scene
+  disabledIds: string[]; // members muted in the active scene (cannot speak)
   messages: RPMessage[];
   generating: boolean;
   speakingId: string | null; // which persona is currently composing a reply
@@ -42,6 +43,7 @@ interface RPState {
   deleteScene: (id: string) => Promise<void>;
   setMembers: (sceneId: string, personaIds: string[]) => Promise<void>;
   addPersonToScene: (personaId: string) => Promise<void>;
+  setMemberEnabled: (personaId: string, enabled: boolean) => Promise<void>;
   clearScene: (id: string) => Promise<void>;
 
   sendUser: (text: string) => Promise<void>;
@@ -64,6 +66,7 @@ export const useRPStore = create<RPState>((set, get) => ({
   scenes: [],
   activeSceneId: null,
   memberIds: [],
+  disabledIds: [],
   messages: [],
   generating: false,
   speakingId: null,
@@ -76,13 +79,14 @@ export const useRPStore = create<RPState>((set, get) => ({
   loadScenes: async () => set({ scenes: await window.polyglot.rpGetScenes() }),
 
   selectScene: async (id) => {
-    set({ activeSceneId: id, messages: [], memberIds: [] });
+    set({ activeSceneId: id, messages: [], memberIds: [], disabledIds: [] });
     if (id) {
-      const [messages, memberIds] = await Promise.all([
+      const [messages, memberIds, disabledIds] = await Promise.all([
         window.polyglot.rpGetSceneMessages(id),
         window.polyglot.rpGetSceneMembers(id),
+        window.polyglot.rpGetSceneDisabled(id),
       ]);
-      if (get().activeSceneId === id) set({ messages, memberIds });
+      if (get().activeSceneId === id) set({ messages, memberIds, disabledIds });
     }
   },
 
@@ -163,6 +167,16 @@ export const useRPStore = create<RPState>((set, get) => ({
       set({ generating: false, speakingId: null });
       await maybeSummarize(get);
     }
+  },
+
+  setMemberEnabled: async (personaId, enabled) => {
+    const sceneId = get().activeSceneId;
+    if (!sceneId) return;
+    await window.polyglot.rpSetMemberEnabled(sceneId, personaId, enabled);
+    const disabled = new Set(get().disabledIds);
+    if (enabled) disabled.delete(personaId);
+    else disabled.add(personaId);
+    set({ disabledIds: [...disabled] });
   },
 
   sendUser: async (text) => {
@@ -288,10 +302,14 @@ function speakerName(get: Get, m: RPMessage): string {
   return get().personaById(m.senderPersonaId)?.name ?? 'Someone';
 }
 
-const aiMembersOf = (get: Get): RPPersona[] =>
-  get()
+// The characters allowed to speak in the active scene: members that aren't you
+// and aren't muted via their checkbox.
+const aiMembersOf = (get: Get): RPPersona[] => {
+  const disabled = new Set(get().disabledIds);
+  return get()
     .memberIds.map((id) => get().personaById(id))
-    .filter((p): p is RPPersona => !!p && !p.isMe);
+    .filter((p): p is RPPersona => !!p && !p.isMe && !disabled.has(p.id));
+};
 
 // The character whose name appears in `text` (used to route who replies next).
 function findAddressed(text: string, candidates: RPPersona[]): RPPersona | undefined {
@@ -370,7 +388,13 @@ async function generateFor(
   let system =
     `You are "${persona.name}". Stay fully in character, speaking in the first person as ` +
     `${persona.name}. Never break character or mention that you are an AI.\n\n` +
-    `Character:\n${persona.description.trim()}`;
+    `Character:\n${persona.description.trim()}\n\n` +
+    `Write in an immersive, novel-like role-play style — never dialogue only. Narrate ` +
+    `${persona.name}'s actions, body language, expressions, and the scene/setting in the third ` +
+    `person wrapped in *asterisks*, and write spoken words as plain text. Every reply must include ` +
+    `at least one *narration* of what ${persona.name} is doing or how the scene looks, not just ` +
+    `speech.\nFor example:\n*Beth walks into the room, confident, wearing a pink shirt and skirt, ` +
+    `and smiles* Hello Adam, how are you?`;
   if (others.length > 0) {
     system +=
       `\n\nThis is a live group conversation. Other characters present: ` +

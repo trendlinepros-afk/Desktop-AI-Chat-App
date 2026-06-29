@@ -296,6 +296,8 @@ export interface WickedAPI {
   rpDeleteScene(id: string): Promise<void>;
   rpGetSceneMembers(sceneId: string): Promise<string[]>;
   rpSetSceneMembers(sceneId: string, personaIds: string[]): Promise<void>;
+  rpGetSceneDisabled(sceneId: string): Promise<string[]>;
+  rpSetMemberEnabled(sceneId: string, personaId: string, enabled: boolean): Promise<void>;
   rpSetSceneSummarized(sceneId: string, count: number): Promise<void>;
   rpGetSceneMessages(sceneId: string): Promise<RPMessage[]>;
   rpSaveSceneMessage(msg: {

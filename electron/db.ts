@@ -151,6 +151,13 @@ export function initDb(): void {
       created_at INTEGER NOT NULL
     );
 
+    -- Characters muted in a scene (present in the cast but not allowed to talk).
+    CREATE TABLE IF NOT EXISTS rp_scene_disabled (
+      scene_id TEXT NOT NULL REFERENCES rp_scenes(id) ON DELETE CASCADE,
+      persona_id TEXT NOT NULL REFERENCES rp_personas(id) ON DELETE CASCADE,
+      PRIMARY KEY (scene_id, persona_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_rp_scene_messages_scene ON rp_scene_messages(scene_id);
     CREATE INDEX IF NOT EXISTS idx_rp_scene_members_scene ON rp_scene_members(scene_id);
   `);
@@ -890,7 +897,37 @@ export function rpSetSceneMembers(sceneId: string, personaIds: string[]): void {
     for (const pid of personaIds) ins.run(sceneId, pid);
   });
   tx();
+  // Drop any "disabled" rows for personas no longer in the cast.
+  if (personaIds.length > 0) {
+    const placeholders = personaIds.map(() => '?').join(',');
+    db.prepare(
+      `DELETE FROM rp_scene_disabled WHERE scene_id = ? AND persona_id NOT IN (${placeholders})`
+    ).run(sceneId, ...personaIds);
+  } else {
+    db.prepare('DELETE FROM rp_scene_disabled WHERE scene_id = ?').run(sceneId);
+  }
   touchScene(sceneId);
+}
+
+// Personas muted in a scene (cannot speak / won't auto-reply).
+export function rpGetSceneDisabled(sceneId: string): string[] {
+  const rows = db
+    .prepare('SELECT persona_id FROM rp_scene_disabled WHERE scene_id = ?')
+    .all(sceneId) as { persona_id: string }[];
+  return rows.map((r) => r.persona_id);
+}
+
+export function rpSetMemberEnabled(sceneId: string, personaId: string, enabled: boolean): void {
+  if (enabled) {
+    db.prepare('DELETE FROM rp_scene_disabled WHERE scene_id = ? AND persona_id = ?').run(
+      sceneId,
+      personaId
+    );
+  } else {
+    db.prepare(
+      'INSERT OR IGNORE INTO rp_scene_disabled (scene_id, persona_id) VALUES (?, ?)'
+    ).run(sceneId, personaId);
+  }
 }
 
 // ---------- Role-Play scene messages ----------

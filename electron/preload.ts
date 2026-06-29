@@ -100,6 +100,9 @@ const api: WickedAPI = {
   rpGetSceneMembers: (sceneId) => ipcRenderer.invoke('rp:getSceneMembers', sceneId),
   rpSetSceneMembers: (sceneId, personaIds) =>
     ipcRenderer.invoke('rp:setSceneMembers', sceneId, personaIds),
+  rpGetSceneDisabled: (sceneId) => ipcRenderer.invoke('rp:getSceneDisabled', sceneId),
+  rpSetMemberEnabled: (sceneId, personaId, enabled) =>
+    ipcRenderer.invoke('rp:setMemberEnabled', sceneId, personaId, enabled),
   rpSetSceneSummarized: (sceneId, count) =>
     ipcRenderer.invoke('rp:setSceneSummarized', sceneId, count),
   rpGetSceneMessages: (sceneId) => ipcRenderer.invoke('rp:getSceneMessages', sceneId),
