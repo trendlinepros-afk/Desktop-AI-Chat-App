@@ -121,6 +121,10 @@ export function initDb(): void {
   if (!columnExists('messages', 'model_version')) {
     db.exec('ALTER TABLE messages ADD COLUMN model_version TEXT');
   }
+  // Nested folders: a folder may live inside another folder.
+  if (!columnExists('folders', 'parent_id')) {
+    db.exec('ALTER TABLE folders ADD COLUMN parent_id TEXT');
+  }
 
   purgeExpiredChats();
 }
@@ -143,11 +147,12 @@ function columnExists(table: string, column: string): boolean {
 interface FolderRow {
   id: string;
   name: string;
+  parent_id: string | null;
   created_at: number;
 }
 
 function mapFolder(r: FolderRow): Folder {
-  return { id: r.id, name: r.name, createdAt: r.created_at };
+  return { id: r.id, name: r.name, parentId: r.parent_id ?? null, createdAt: r.created_at };
 }
 
 export function getFolders(): Folder[] {
@@ -155,11 +160,12 @@ export function getFolders(): Folder[] {
   return rows.map(mapFolder);
 }
 
-export function createFolder(name: string): Folder {
-  const folder: FolderRow = { id: randomUUID(), name, created_at: Date.now() };
-  db.prepare('INSERT INTO folders (id, name, created_at) VALUES (?, ?, ?)').run(
+export function createFolder(name: string, parentId: string | null = null): Folder {
+  const folder: FolderRow = { id: randomUUID(), name, parent_id: parentId, created_at: Date.now() };
+  db.prepare('INSERT INTO folders (id, name, parent_id, created_at) VALUES (?, ?, ?, ?)').run(
     folder.id,
     folder.name,
+    folder.parent_id,
     folder.created_at
   );
   return mapFolder(folder);
@@ -169,8 +175,34 @@ export function renameFolder(id: string, name: string): void {
   db.prepare('UPDATE folders SET name = ? WHERE id = ?').run(name, id);
 }
 
+// Re-parent a folder. Guards against making a folder its own descendant.
+export function moveFolder(id: string, parentId: string | null): void {
+  if (parentId) {
+    if (parentId === id) return;
+    // Walk up from the proposed parent — if we hit `id`, this move would
+    // create a cycle, so reject it.
+    let cursor: string | null = parentId;
+    const byId = new Map(
+      (db.prepare('SELECT id, parent_id FROM folders').all() as FolderRow[]).map((r) => [
+        r.id,
+        r.parent_id,
+      ])
+    );
+    while (cursor) {
+      if (cursor === id) return;
+      cursor = byId.get(cursor) ?? null;
+    }
+  }
+  db.prepare('UPDATE folders SET parent_id = ? WHERE id = ?').run(parentId, id);
+}
+
 export function deleteFolder(id: string): void {
-  // ON DELETE SET NULL moves chats to uncategorized automatically.
+  // Recursively delete sub-folders first; chats in any of them fall back to
+  // Uncategorized via the chats.folder_id ON DELETE SET NULL constraint.
+  const children = db
+    .prepare('SELECT id FROM folders WHERE parent_id = ?')
+    .all(id) as { id: string }[];
+  for (const child of children) deleteFolder(child.id);
   db.prepare('DELETE FROM folders WHERE id = ?').run(id);
 }
 

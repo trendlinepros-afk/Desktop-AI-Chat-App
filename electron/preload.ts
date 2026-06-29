@@ -31,8 +31,9 @@ const api: WickedAPI = {
 
   // Folders
   getFolders: () => ipcRenderer.invoke('folders:getAll'),
-  createFolder: (name) => ipcRenderer.invoke('folders:create', name),
+  createFolder: (name, parentId) => ipcRenderer.invoke('folders:create', name, parentId ?? null),
   renameFolder: (id, name) => ipcRenderer.invoke('folders:rename', id, name),
+  moveFolder: (id, parentId) => ipcRenderer.invoke('folders:move', id, parentId),
   deleteFolder: (id) => ipcRenderer.invoke('folders:delete', id),
 
   // Messages

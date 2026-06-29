@@ -35,8 +35,8 @@ export function Sidebar() {
       </div>
 
       <div className="mt-2 flex-1 overflow-y-auto px-2 pb-2">
-        <UncategorizedList />
         <FolderList />
+        <UncategorizedList />
       </div>
 
       <div className="border-t border-edge px-3 py-2.5">

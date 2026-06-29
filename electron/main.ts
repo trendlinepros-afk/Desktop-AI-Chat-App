@@ -149,8 +149,13 @@ function registerIpc(): void {
 
   // ----- Folders -----
   ipcMain.handle('folders:getAll', () => db.getFolders());
-  ipcMain.handle('folders:create', (_e, name: string) => db.createFolder(name));
+  ipcMain.handle('folders:create', (_e, name: string, parentId: string | null) =>
+    db.createFolder(name, parentId)
+  );
   ipcMain.handle('folders:rename', (_e, id: string, name: string) => db.renameFolder(id, name));
+  ipcMain.handle('folders:move', (_e, id: string, parentId: string | null) =>
+    db.moveFolder(id, parentId)
+  );
   ipcMain.handle('folders:delete', (_e, id: string) => db.deleteFolder(id));
 
   // ----- Messages -----

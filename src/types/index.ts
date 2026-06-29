@@ -3,6 +3,7 @@ export type Provider = 'openai' | 'gemini' | 'deepseek' | 'ollama';
 export interface Folder {
   id: string;
   name: string;
+  parentId: string | null; // null = top-level folder
   createdAt: number;
 }
 
@@ -154,8 +155,9 @@ export interface WickedAPI {
 
   // Folders
   getFolders(): Promise<Folder[]>;
-  createFolder(name: string): Promise<Folder>;
+  createFolder(name: string, parentId?: string | null): Promise<Folder>;
   renameFolder(id: string, name: string): Promise<void>;
+  moveFolder(id: string, parentId: string | null): Promise<void>;
   deleteFolder(id: string): Promise<void>;
 
   // Messages

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Chat } from '../../types';
 import { useChatStore } from '../../store/chatStore';
 import { useFolderStore } from '../../store/folderStore';
 import { useUIStore } from '../../store/uiStore';
 import { providerColor } from '../ModelSelector/modelConfig';
 import { exportChat } from '../../lib/exportChat';
+import { DND_CHAT, flattenFolders } from '../../lib/folderTree';
 
 export function ChatListItem({ chat }: { chat: Chat }) {
   const activeChatId = useChatStore((s) => s.activeChatId);
@@ -20,6 +21,7 @@ export function ChatListItem({ chat }: { chat: Chat }) {
   const [draft, setDraft] = useState(chat.title);
 
   const active = activeChatId === chat.id;
+  const folderTree = useMemo(() => flattenFolders(folders), [folders]);
 
   const submitRename = () => {
     const trimmed = draft.trim();
@@ -44,7 +46,15 @@ export function ChatListItem({ chat }: { chat: Chat }) {
   }
 
   return (
-    <div className="group relative">
+    <div
+      className="group relative"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DND_CHAT, chat.id);
+        e.dataTransfer.setData('text/plain', chat.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+    >
       <button
         onClick={() => selectChat(chat.id)}
         className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
@@ -88,12 +98,12 @@ export function ChatListItem({ chat }: { chat: Chat }) {
                 setMenuOpen(false);
               }}
             />
-            {folders.map((f) => (
+            {folderTree.map(({ folder, depth }) => (
               <MenuItem
-                key={f.id}
-                label={`📁 ${f.name}`}
+                key={folder.id}
+                label={`${'  '.repeat(depth)}📁 ${folder.name}`}
                 onClick={() => {
-                  moveChat(chat.id, f.id);
+                  moveChat(chat.id, folder.id);
                   setMenuOpen(false);
                 }}
               />
