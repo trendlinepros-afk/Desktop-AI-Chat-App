@@ -93,15 +93,26 @@ const api: WickedAPI = {
   rpCreatePersona: (data) => ipcRenderer.invoke('rp:createPersona', data),
   rpUpdatePersona: (id, patch) => ipcRenderer.invoke('rp:updatePersona', id, patch),
   rpDeletePersona: (id) => ipcRenderer.invoke('rp:deletePersona', id),
-  rpGetMessages: (personaId) => ipcRenderer.invoke('rp:getMessages', personaId),
-  rpSaveMessage: (msg) => ipcRenderer.invoke('rp:saveMessage', msg),
-  rpClearMessages: (personaId) => ipcRenderer.invoke('rp:clearMessages', personaId),
-  rpSetSummarized: (personaId, count) => ipcRenderer.invoke('rp:setSummarized', personaId, count),
-  rpReadMemory: (personaId) => ipcRenderer.invoke('rp:readMemory', personaId),
-  rpAppendMemory: (personaId, personaName, summary) =>
-    ipcRenderer.invoke('rp:appendMemory', personaId, personaName, summary),
-  rpClearMemory: (personaId) => ipcRenderer.invoke('rp:clearMemory', personaId),
+  rpGetScenes: () => ipcRenderer.invoke('rp:getScenes'),
+  rpCreateScene: (name, personaIds) => ipcRenderer.invoke('rp:createScene', name, personaIds),
+  rpRenameScene: (id, name) => ipcRenderer.invoke('rp:renameScene', id, name),
+  rpDeleteScene: (id) => ipcRenderer.invoke('rp:deleteScene', id),
+  rpGetSceneMembers: (sceneId) => ipcRenderer.invoke('rp:getSceneMembers', sceneId),
+  rpSetSceneMembers: (sceneId, personaIds) =>
+    ipcRenderer.invoke('rp:setSceneMembers', sceneId, personaIds),
+  rpSetSceneSummarized: (sceneId, count) =>
+    ipcRenderer.invoke('rp:setSceneSummarized', sceneId, count),
+  rpGetSceneMessages: (sceneId) => ipcRenderer.invoke('rp:getSceneMessages', sceneId),
+  rpSaveSceneMessage: (msg) => ipcRenderer.invoke('rp:saveSceneMessage', msg),
+  rpClearScene: (sceneId) => ipcRenderer.invoke('rp:clearScene', sceneId),
+  rpReadMemory: (sceneId) => ipcRenderer.invoke('rp:readMemory', sceneId),
+  rpAppendMemory: (sceneId, sceneName, summary) =>
+    ipcRenderer.invoke('rp:appendMemory', sceneId, sceneName, summary),
+  rpClearMemory: (sceneId) => ipcRenderer.invoke('rp:clearMemory', sceneId),
   rpOpenMemoryFolder: () => ipcRenderer.invoke('rp:openMemoryFolder'),
+  rpSyncProfiles: () => ipcRenderer.invoke('rp:syncProfiles'),
+  rpGrokComplete: (apiKey, model, messages) =>
+    ipcRenderer.invoke('rp:grokComplete', apiKey, model, messages),
 
   // Shell
   openExternal: (p) => ipcRenderer.invoke('shell:openExternal', p),

@@ -26,6 +26,7 @@ export function PersonaEditor({
   const [description, setDescription] = useState(existing?.description ?? '');
   const [greeting, setGreeting] = useState(existing?.greeting ?? '');
   const [model, setModel] = useState(existing?.model ?? defaultModel);
+  const [isMe, setIsMe] = useState(existing?.isMe ?? false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -43,10 +44,10 @@ export function PersonaEditor({
       return;
     }
     if (existing) {
-      await updatePersona(existing.id, { name, avatar, description, greeting, model });
+      await updatePersona(existing.id, { name, avatar, description, greeting, model, isMe });
       toast('Persona updated', 'success');
     } else {
-      await createPersona({ name, avatar, description, greeting, model });
+      await createPersona({ name, avatar, description, greeting, model, isMe });
       toast('Persona created', 'success');
     }
     onClose();
@@ -54,7 +55,7 @@ export function PersonaEditor({
 
   const onDelete = async () => {
     if (!existing) return;
-    if (!confirm(`Delete "${existing.name}" and its memory? This can't be undone.`)) return;
+    if (!confirm(`Delete "${existing.name}"? This can't be undone.`)) return;
     await deletePersona(existing.id);
     toast('Persona deleted', 'info');
     onClose();
@@ -91,47 +92,67 @@ export function PersonaEditor({
             </div>
           </div>
 
+          <label className="flex items-start gap-2 rounded-lg border border-edge bg-surface px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isMe}
+              onChange={(e) => setIsMe(e.target.checked)}
+              className="mt-0.5 accent-accent"
+            />
+            <span>
+              <span className="font-medium">This persona is me</span>
+              <span className="block text-xs text-text-muted">
+                Use this for your own background. Its description tells the other characters who
+                you are, and your typed messages appear as this persona. Only one can be “me”.
+              </span>
+            </span>
+          </label>
+
           <div>
             <label className="mb-1 block text-xs text-text-muted">
-              Character / personality
+              {isMe ? 'Your background' : 'Character / personality'}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe who they are: background, personality, how they speak, what they know, their relationship to you…"
+              placeholder={
+                isMe
+                  ? 'Describe yourself: who you are, your background, how you come across…'
+                  : 'Describe who they are: background, personality, how they speak, what they know, their relationship to you…'
+              }
               rows={6}
               className="w-full resize-y rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
             />
-            <p className="mt-1 text-xs text-text-muted">
-              This becomes the persona's character. The agent stays in character and keeps a
-              separate long-term memory of your conversations.
-            </p>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs text-text-muted">Opening line (optional)</label>
-            <input
-              value={greeting}
-              onChange={(e) => setGreeting(e.target.value)}
-              placeholder="The first thing they say when the chat starts"
-              className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-            />
-          </div>
+          {!isMe && (
+            <div>
+              <label className="mb-1 block text-xs text-text-muted">Opening line (optional)</label>
+              <input
+                value={greeting}
+                onChange={(e) => setGreeting(e.target.value)}
+                placeholder="The first thing they say when added to a conversation"
+                className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+            </div>
+          )}
 
-          <div>
-            <label className="mb-1 block text-xs text-text-muted">Grok model</label>
-            <input
-              list="rp-grok-models"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-            />
-            <datalist id="rp-grok-models">
-              {modelOptions.map((m) => (
-                <option key={m} value={m} />
-              ))}
-            </datalist>
-          </div>
+          {!isMe && (
+            <div>
+              <label className="mb-1 block text-xs text-text-muted">Grok model</label>
+              <input
+                list="rp-persona-models"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+              <datalist id="rp-persona-models">
+                {modelOptions.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-edge px-5 py-3">

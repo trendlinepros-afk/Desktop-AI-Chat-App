@@ -83,8 +83,9 @@ export interface MemoryReview {
 
 // ---------- Role-Play (RP) ----------
 // A separate, self-contained side of the app: build personas of people you can
-// talk to. Personas, their chats, and their memory are kept entirely apart from
-// the main app's chats and the Obsidian Brain vault.
+// talk to, then drop several of them into one group conversation (a "scene").
+// Personas, scenes, and their memory are kept entirely apart from the main app's
+// chats and the Obsidian Brain vault.
 
 export interface RPPersona {
   id: string;
@@ -93,6 +94,15 @@ export interface RPPersona {
   avatar: string; // an emoji shown in the list
   greeting: string; // optional opening line the persona sends first
   model: string; // Grok model used for this persona
+  isMe: boolean; // marks the persona that represents YOU (your background)
+  createdAt: number;
+  updatedAt: number;
+}
+
+// A group conversation containing one or more personas.
+export interface RPScene {
+  id: string;
+  name: string;
   createdAt: number;
   updatedAt: number;
   summarizedCount: number; // # of messages already folded into the memory file
@@ -100,8 +110,8 @@ export interface RPPersona {
 
 export interface RPMessage {
   id: string;
-  personaId: string;
-  role: 'user' | 'assistant';
+  sceneId: string;
+  senderPersonaId: string | null; // null = a line typed by you (the human)
   content: string;
   createdAt: number;
 }
@@ -260,7 +270,7 @@ export interface WickedAPI {
   // Model discovery (OpenAI/DeepSeek listed in the main process to avoid CORS)
   listOpenAICompatModels(baseUrl: string, apiKey: string): Promise<string[]>;
 
-  // Role-Play (RP) — personas + their chats, stored separately from main chats
+  // Role-Play (RP) — personas, group scenes, and their chats, stored separately
   rpGetPersonas(): Promise<RPPersona[]>;
   rpCreatePersona(data: {
     name: string;
@@ -268,26 +278,45 @@ export interface WickedAPI {
     avatar?: string;
     greeting?: string;
     model: string;
+    isMe?: boolean;
   }): Promise<RPPersona>;
   rpUpdatePersona(
     id: string,
-    patch: Partial<Pick<RPPersona, 'name' | 'description' | 'avatar' | 'greeting' | 'model'>>
+    patch: Partial<
+      Pick<RPPersona, 'name' | 'description' | 'avatar' | 'greeting' | 'model' | 'isMe'>
+    >
   ): Promise<void>;
   rpDeletePersona(id: string): Promise<void>;
-  rpGetMessages(personaId: string): Promise<RPMessage[]>;
-  rpSaveMessage(msg: {
-    personaId: string;
-    role: 'user' | 'assistant';
+
+  // Scenes (group conversations)
+  rpGetScenes(): Promise<RPScene[]>;
+  rpCreateScene(name: string, personaIds: string[]): Promise<RPScene>;
+  rpRenameScene(id: string, name: string): Promise<void>;
+  rpDeleteScene(id: string): Promise<void>;
+  rpGetSceneMembers(sceneId: string): Promise<string[]>;
+  rpSetSceneMembers(sceneId: string, personaIds: string[]): Promise<void>;
+  rpSetSceneSummarized(sceneId: string, count: number): Promise<void>;
+  rpGetSceneMessages(sceneId: string): Promise<RPMessage[]>;
+  rpSaveSceneMessage(msg: {
+    sceneId: string;
+    senderPersonaId: string | null;
     content: string;
   }): Promise<RPMessage>;
-  rpClearMessages(personaId: string): Promise<void>;
-  rpSetSummarized(personaId: string, count: number): Promise<void>;
+  rpClearScene(sceneId: string): Promise<void>;
 
   // RP memory — markdown files in a folder kept separate from the Brain vault
-  rpReadMemory(personaId: string): Promise<string>;
-  rpAppendMemory(personaId: string, personaName: string, summary: string): Promise<void>;
-  rpClearMemory(personaId: string): Promise<void>;
+  rpReadMemory(sceneId: string): Promise<string>;
+  rpAppendMemory(sceneId: string, sceneName: string, summary: string): Promise<void>;
+  rpClearMemory(sceneId: string): Promise<void>;
   rpOpenMemoryFolder(): Promise<void>;
+  rpSyncProfiles(): Promise<void>;
+
+  // Grok (xAI) completion — run in the main process to avoid renderer CORS.
+  rpGrokComplete(
+    apiKey: string,
+    model: string,
+    messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
+  ): Promise<string>;
 
   // Shell
   openExternal(path: string): Promise<void>;

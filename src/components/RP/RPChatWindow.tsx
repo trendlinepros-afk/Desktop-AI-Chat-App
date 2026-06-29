@@ -2,18 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import { useRPStore } from '../../store/rpStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
+import type { RPMessage, RPPersona } from '../../types';
 
-export function RPChatWindow({ onEdit }: { onEdit: (id: string) => void }) {
-  const personas = useRPStore((s) => s.personas);
-  const activeId = useRPStore((s) => s.activePersonaId);
+export function RPChatWindow({ onEditScene }: { onEditScene: (sceneId: string) => void }) {
+  const scenes = useRPStore((s) => s.scenes);
+  const activeSceneId = useRPStore((s) => s.activeSceneId);
+  const memberIds = useRPStore((s) => s.memberIds);
   const messages = useRPStore((s) => s.messages);
-  const streamingText = useRPStore((s) => s.streamingText);
-  const isStreaming = useRPStore((s) => s.isStreaming);
+  const personas = useRPStore((s) => s.personas);
+  const generating = useRPStore((s) => s.generating);
+  const speakingId = useRPStore((s) => s.speakingId);
   const summarizing = useRPStore((s) => s.summarizing);
-  const send = useRPStore((s) => s.send);
+  const sendUser = useRPStore((s) => s.sendUser);
+  const haveSpeak = useRPStore((s) => s.haveSpeak);
   const stop = useRPStore((s) => s.stop);
   const summarizeNow = useRPStore((s) => s.summarizeNow);
-  const clearConversation = useRPStore((s) => s.clearConversation);
+  const clearScene = useRPStore((s) => s.clearScene);
   const grokKey = useSettingsStore((s) => s.settings.grokApiKey);
   const rpVaultPath = useSettingsStore((s) => s.settings.rpVaultPath);
   const toast = useUIStore((s) => s.toast);
@@ -21,20 +25,26 @@ export function RPChatWindow({ onEdit }: { onEdit: (id: string) => void }) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const persona = personas.find((p) => p.id === activeId) ?? null;
+  const scene = scenes.find((s) => s.id === activeSceneId) ?? null;
+  const byId = (id: string | null): RPPersona | undefined =>
+    id ? personas.find((p) => p.id === id) : undefined;
+  const me = personas.find((p) => p.isMe);
+  const members = memberIds.map(byId).filter((p): p is RPPersona => !!p);
+  const aiMembers = members.filter((p) => !p.isMe);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, streamingText]);
+  }, [messages, generating]);
 
-  if (!persona) {
+  if (!scene) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         <div className="text-5xl">🎭</div>
         <h2 className="mt-4 text-xl font-semibold">Role-Play Studio</h2>
-        <p className="mt-2 max-w-sm text-sm text-text-muted">
-          Build personas of people you can talk to. Each persona keeps its own long-term memory —
-          separate from WICKED's Brain — so conversations don't lose context over time.
+        <p className="mt-2 max-w-md text-sm text-text-muted">
+          Create personas (including one marked “me” for your own background), then start a
+          conversation and drop several of them in together. Each keeps a shared long-term memory,
+          separate from WICKED's Brain.
         </p>
         {!grokKey && (
           <p className="mt-3 text-xs text-brain">
@@ -43,8 +53,7 @@ export function RPChatWindow({ onEdit }: { onEdit: (id: string) => void }) {
         )}
         {!rpVaultPath && (
           <p className="mt-1 text-xs text-brain">
-            Tip: in ⚙️ RP Settings, choose a separate Obsidian vault folder to store this side's
-            memory.
+            Tip: in ⚙️ RP Settings, choose a separate Obsidian vault to store personas + memory.
           </p>
         )}
       </div>
@@ -53,72 +62,112 @@ export function RPChatWindow({ onEdit }: { onEdit: (id: string) => void }) {
 
   const submit = () => {
     const text = input.trim();
-    if (!text || isStreaming) return;
+    if (!text || generating) return;
     if (!grokKey) {
       toast('Add your Grok API key in RP Settings first', 'error');
       return;
     }
+    if (aiMembers.length === 0) {
+      toast('Add at least one character to this conversation', 'error');
+      return;
+    }
     setInput('');
-    void send(text);
+    void sendUser(text);
   };
+
+  const isMine = (m: RPMessage) =>
+    m.senderPersonaId === null || (!!me && m.senderPersonaId === me.id);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-edge bg-chat px-4 py-2">
-        <span className="text-lg">{persona.avatar}</span>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-medium">{persona.name}</h2>
-          <p className="truncate text-xs text-text-muted">{persona.model}</p>
+          <h2 className="truncate text-sm font-medium">{scene.name}</h2>
+          <p className="truncate text-xs text-text-muted">
+            {members.length > 0 ? members.map((p) => `${p.avatar} ${p.name}`).join(' · ') : 'No one yet'}
+          </p>
         </div>
         {summarizing && <span className="text-xs text-brain">💭 saving memory…</span>}
         <button
-          onClick={() => summarizeNow(persona.id)}
+          onClick={() => onEditScene(scene.id)}
+          title="Add or remove characters"
+          className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
+        >
+          👥 Cast
+        </button>
+        <button
+          onClick={() => summarizeNow(scene.id)}
           disabled={summarizing}
-          title="Summarize the conversation so far into this persona's memory now"
+          title="Summarize the conversation so far into memory now"
           className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary disabled:opacity-50"
         >
           💾 Save memory
         </button>
         <button
           onClick={() => window.polyglot.rpOpenMemoryFolder()}
-          title="Open the folder where RP memory files are stored"
+          title="Open the RP memory/persona folder"
           className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
         >
-          🧠 Memory
+          🧠 Vault
         </button>
         <button
           onClick={() => {
-            if (confirm(`Clear the conversation and memory for "${persona.name}"?`))
-              clearConversation(persona.id);
+            if (confirm(`Clear the conversation and memory for "${scene.name}"?`))
+              clearScene(scene.id);
           }}
           title="Clear this conversation and its memory"
           className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
         >
           🗑 Clear
         </button>
-        <button
-          onClick={() => onEdit(persona.id)}
-          className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
-        >
-          ✏️ Edit
-        </button>
       </div>
 
       {/* Messages */}
       <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        {messages.length === 0 && !isStreaming && (
+        {messages.length === 0 && !generating && (
           <p className="py-10 text-center text-sm text-text-muted">
-            Say something to {persona.name} to begin.
+            Say something to begin the scene.
           </p>
         )}
-        {messages.map((m) => (
-          <Bubble key={m.id} role={m.role} avatar={persona.avatar} text={m.content} />
-        ))}
-        {isStreaming && (
-          <Bubble role="assistant" avatar={persona.avatar} text={streamingText || '…'} />
+        {messages.map((m) => {
+          const sender = byId(m.senderPersonaId);
+          return (
+            <Bubble
+              key={m.id}
+              mine={isMine(m)}
+              avatar={sender?.avatar ?? '🧑'}
+              name={sender?.name ?? 'You'}
+              text={m.content}
+            />
+          );
+        })}
+        {generating && speakingId && (
+          <Bubble
+            mine={false}
+            avatar={byId(speakingId)?.avatar ?? '🎭'}
+            name={byId(speakingId)?.name ?? ''}
+            text="…"
+          />
         )}
       </div>
+
+      {/* Nudge a specific character to speak */}
+      {aiMembers.length > 0 && (
+        <div className="flex flex-wrap gap-1 border-t border-edge bg-chat px-4 py-2">
+          <span className="self-center text-xs text-text-muted">Have someone speak:</span>
+          {aiMembers.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => haveSpeak(p.id)}
+              disabled={generating}
+              className="rounded-full border border-edge px-2 py-0.5 text-xs text-text-muted hover:text-text-primary disabled:opacity-40"
+            >
+              {p.avatar} {p.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Input */}
       <div className="border-t border-edge bg-chat px-4 py-3">
@@ -132,11 +181,11 @@ export function RPChatWindow({ onEdit }: { onEdit: (id: string) => void }) {
                 submit();
               }
             }}
-            placeholder={`Message ${persona.name}…`}
+            placeholder={me ? `Message as ${me.name}…` : 'Type your message…'}
             rows={1}
             className="max-h-40 flex-1 resize-none rounded-xl border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
           />
-          {isStreaming ? (
+          {generating ? (
             <button
               onClick={stop}
               className="rounded-xl border border-edge px-4 py-2 text-sm text-text-muted hover:text-text-primary"
@@ -158,24 +207,28 @@ export function RPChatWindow({ onEdit }: { onEdit: (id: string) => void }) {
 }
 
 function Bubble({
-  role,
+  mine,
   avatar,
+  name,
   text,
 }: {
-  role: 'user' | 'assistant' | 'system';
+  mine: boolean;
   avatar: string;
+  name: string;
   text: string;
 }) {
-  const isUser = role === 'user';
   return (
-    <div className={`flex gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
-      {!isUser && <span className="mt-1 text-lg leading-none">{avatar}</span>}
-      <div
-        className={`max-w-[75%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${
-          isUser ? 'bg-user text-white' : 'bg-surface text-text-primary'
-        }`}
-      >
-        {text}
+    <div className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+      {!mine && <span className="mt-1 text-lg leading-none">{avatar}</span>}
+      <div className="max-w-[75%]">
+        {!mine && <div className="mb-0.5 text-xs text-text-muted">{name}</div>}
+        <div
+          className={`whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${
+            mine ? 'bg-user text-white' : 'bg-surface text-text-primary'
+          }`}
+        >
+          {text}
+        </div>
       </div>
     </div>
   );
