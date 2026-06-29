@@ -1,65 +1,26 @@
-import OpenAI from 'openai';
-import type { ChatCompletionMessageParam } from 'openai/resources/index';
-import { withRetry } from './retry';
-
-// The Role-Play side talks to the Grok (xAI) API. Grok is OpenAI-compatible, so
-// we drive it with the OpenAI SDK pointed at xAI's base URL. This is kept fully
-// separate from the main app's model plumbing (useChat) on purpose.
+// The Role-Play side talks to the Grok (xAI) API. The actual HTTP call runs in
+// the Electron MAIN process (see rp:grokComplete) — a direct fetch from the
+// renderer to api.x.ai is blocked by CORS and surfaces as a bare
+// "Connection error", so everything here funnels through the preload bridge.
 
 export const GROK_BASE_URL = 'https://api.x.ai/v1';
 
 // Sensible defaults shown before (or instead of) a live fetch from the key.
 export const GROK_MODELS = ['grok-4', 'grok-3', 'grok-3-mini', 'grok-2-latest', 'grok-beta'];
 
-function client(apiKey: string): OpenAI {
-  return new OpenAI({ apiKey, baseURL: GROK_BASE_URL, dangerouslyAllowBrowser: true });
-}
-
 export interface RPTurn {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
-// Stream a reply from Grok, calling onToken with the cumulative text each chunk.
-export async function streamGrok(
+// One Grok completion (non-streaming). Used for both persona replies and the
+// memory summaries.
+export async function grokComplete(
   apiKey: string,
   model: string,
-  messages: RPTurn[],
-  onToken: (full: string) => void,
-  signal?: AbortSignal
+  messages: RPTurn[]
 ): Promise<string> {
-  if (!apiKey) throw new Error('No Grok API key set. Add one in RP settings.');
-  const stream = await withRetry(() =>
-    client(apiKey).chat.completions.create({
-      model,
-      messages: messages as ChatCompletionMessageParam[],
-      stream: true,
-    })
-  );
-  let full = '';
-  for await (const chunk of stream) {
-    if (signal?.aborted) break;
-    full += chunk.choices[0]?.delta?.content || '';
-    onToken(full);
-  }
-  return full;
-}
-
-// One-shot (non-streaming) completion — used to summarize a conversation into
-// the persona's long-term memory file.
-export async function completeGrok(
-  apiKey: string,
-  model: string,
-  prompt: string
-): Promise<string> {
-  if (!apiKey) throw new Error('No Grok API key set.');
-  const res = await withRetry(() =>
-    client(apiKey).chat.completions.create({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-    })
-  );
-  return res.choices[0]?.message?.content ?? '';
+  return window.polyglot.rpGrokComplete(apiKey, model, messages);
 }
 
 // List the chat models the Grok key can actually call (via the main process to

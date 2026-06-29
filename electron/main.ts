@@ -325,25 +325,104 @@ function registerIpc(): void {
   });
 
   // ----- Role-Play (RP) -----
+  // Persona writes also mirror a markdown profile into the RP vault so the
+  // roster is visible in Obsidian. safeVault swallows errors when no vault yet.
   ipcMain.handle('rp:getPersonas', () => db.rpGetPersonas());
-  ipcMain.handle('rp:createPersona', (_e, data) => db.rpCreatePersona(data));
-  ipcMain.handle('rp:updatePersona', (_e, id: string, patch) => db.rpUpdatePersona(id, patch));
+  ipcMain.handle('rp:createPersona', (_e, data) => {
+    const persona = db.rpCreatePersona(data);
+    safeVault(() => rpMemory.writePersonaProfile(persona), undefined);
+    return persona;
+  });
+  ipcMain.handle('rp:updatePersona', (_e, id: string, patch) => {
+    db.rpUpdatePersona(id, patch);
+    const persona = db.rpGetPersonas().find((p) => p.id === id);
+    if (persona) safeVault(() => rpMemory.writePersonaProfile(persona), undefined);
+  });
   ipcMain.handle('rp:deletePersona', (_e, id: string) => {
     db.rpDeletePersona(id);
-    rpMemory.clearMemory(id);
+    safeVault(() => rpMemory.deletePersonaProfile(id), undefined);
   });
-  ipcMain.handle('rp:getMessages', (_e, personaId: string) => db.rpGetMessages(personaId));
-  ipcMain.handle('rp:saveMessage', (_e, msg) => db.rpSaveMessage(msg));
-  ipcMain.handle('rp:clearMessages', (_e, personaId: string) => db.rpClearMessages(personaId));
-  ipcMain.handle('rp:setSummarized', (_e, personaId: string, count: number) =>
-    db.rpSetSummarized(personaId, count)
+  ipcMain.handle('rp:syncProfiles', () =>
+    safeVault(() => rpMemory.syncPersonaProfiles(db.rpGetPersonas()), undefined)
   );
-  ipcMain.handle('rp:readMemory', (_e, personaId: string) => rpMemory.readMemory(personaId));
-  ipcMain.handle('rp:appendMemory', (_e, personaId: string, personaName: string, summary: string) =>
-    rpMemory.appendMemory(personaId, personaName, summary)
+
+  // Scenes
+  ipcMain.handle('rp:getScenes', () => db.rpGetScenes());
+  ipcMain.handle('rp:createScene', (_e, name: string, personaIds: string[]) =>
+    db.rpCreateScene(name, personaIds)
   );
-  ipcMain.handle('rp:clearMemory', (_e, personaId: string) => rpMemory.clearMemory(personaId));
+  ipcMain.handle('rp:renameScene', (_e, id: string, name: string) => db.rpRenameScene(id, name));
+  ipcMain.handle('rp:deleteScene', (_e, id: string) => {
+    db.rpDeleteScene(id);
+    safeVault(() => rpMemory.clearMemory(id), undefined);
+  });
+  ipcMain.handle('rp:getSceneMembers', (_e, sceneId: string) => db.rpGetSceneMembers(sceneId));
+  ipcMain.handle('rp:setSceneMembers', (_e, sceneId: string, personaIds: string[]) =>
+    db.rpSetSceneMembers(sceneId, personaIds)
+  );
+  ipcMain.handle('rp:setSceneSummarized', (_e, sceneId: string, count: number) =>
+    db.rpSetSceneSummarized(sceneId, count)
+  );
+  ipcMain.handle('rp:getSceneMessages', (_e, sceneId: string) => db.rpGetSceneMessages(sceneId));
+  ipcMain.handle('rp:saveSceneMessage', (_e, msg) => db.rpSaveSceneMessage(msg));
+  ipcMain.handle('rp:clearScene', (_e, sceneId: string) => {
+    db.rpClearScene(sceneId);
+    safeVault(() => rpMemory.clearMemory(sceneId), undefined);
+  });
+
+  // Memory
+  ipcMain.handle('rp:readMemory', (_e, sceneId: string) =>
+    safeVault(() => rpMemory.readMemory(sceneId), '')
+  );
+  ipcMain.handle('rp:appendMemory', (_e, sceneId: string, sceneName: string, summary: string) =>
+    safeVault(() => rpMemory.appendMemory(sceneId, sceneName, summary), undefined)
+  );
+  ipcMain.handle('rp:clearMemory', (_e, sceneId: string) =>
+    safeVault(() => rpMemory.clearMemory(sceneId), undefined)
+  );
   ipcMain.handle('rp:openMemoryFolder', () => rpMemory.openMemoryFolder());
+
+  // Grok (xAI) chat completion. Done in the main process (Node) so it isn't
+  // subject to renderer CORS — a direct browser fetch to api.x.ai fails and the
+  // SDK surfaces it as a bare "Connection error".
+  ipcMain.handle(
+    'rp:grokComplete',
+    async (
+      _e,
+      apiKey: string,
+      model: string,
+      messages: { role: string; content: string }[]
+    ) => {
+      if (!apiKey) throw new Error('No Grok API key set. Add one in RP Settings.');
+      let res: Response;
+      try {
+        res = await fetch('https://api.x.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({ model, messages }),
+        });
+      } catch (err) {
+        throw new Error(`Couldn't reach the Grok API: ${(err as Error).message}`);
+      }
+      if (!res.ok) {
+        let detail = '';
+        try {
+          const j = (await res.json()) as { error?: { message?: string } | string };
+          detail = typeof j.error === 'string' ? j.error : j.error?.message || '';
+        } catch {
+          detail = (await res.text().catch(() => '')) || '';
+        }
+        throw new Error(`Grok API error (${res.status}): ${detail.slice(0, 200)}`);
+      }
+      const data = (await res.json()) as {
+        choices?: { message?: { content?: string } }[];
+      };
+      return data.choices?.[0]?.message?.content ?? '';
+    }
+  );
 
   // ----- Shell -----
   ipcMain.handle('shell:openExternal', (_e, p: string) => {

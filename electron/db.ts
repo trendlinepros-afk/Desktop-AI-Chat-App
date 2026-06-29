@@ -2,7 +2,16 @@ import Database from 'better-sqlite3';
 import { app, safeStorage } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { Chat, Folder, Message, Provider, RPMessage, RPPersona, Settings } from '../src/types';
+import type {
+  Chat,
+  Folder,
+  Message,
+  Provider,
+  RPMessage,
+  RPPersona,
+  RPScene,
+  Settings,
+} from '../src/types';
 
 // API keys are stored encrypted at rest via the OS keychain (safeStorage).
 const SECRET_KEYS = new Set(['openaiApiKey', 'geminiApiKey', 'deepseekApiKey', 'grokApiKey']);
@@ -104,8 +113,8 @@ export function initDb(): void {
     CREATE INDEX IF NOT EXISTS idx_chats_folder ON chats(folder_id);
     CREATE INDEX IF NOT EXISTS idx_links_source ON chat_links(source_chat_id);
 
-    -- Role-Play (RP): personas and their chats live in their own tables so they
-    -- never mix with the main app's chats/messages.
+    -- Role-Play (RP): personas, group scenes and their messages live in their
+    -- own tables so they never mix with the main app's chats/messages.
     CREATE TABLE IF NOT EXISTS rp_personas (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -113,21 +122,42 @@ export function initDb(): void {
       avatar TEXT NOT NULL DEFAULT '🎭',
       greeting TEXT NOT NULL DEFAULT '',
       model TEXT NOT NULL,
+      is_me INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       summarized_count INTEGER NOT NULL DEFAULT 0
     );
 
-    CREATE TABLE IF NOT EXISTS rp_messages (
+    CREATE TABLE IF NOT EXISTS rp_scenes (
       id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      summarized_count INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS rp_scene_members (
+      scene_id TEXT NOT NULL REFERENCES rp_scenes(id) ON DELETE CASCADE,
       persona_id TEXT NOT NULL REFERENCES rp_personas(id) ON DELETE CASCADE,
-      role TEXT NOT NULL,
+      PRIMARY KEY (scene_id, persona_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS rp_scene_messages (
+      id TEXT PRIMARY KEY,
+      scene_id TEXT NOT NULL REFERENCES rp_scenes(id) ON DELETE CASCADE,
+      sender_persona_id TEXT,
       content TEXT NOT NULL,
       created_at INTEGER NOT NULL
     );
 
-    CREATE INDEX IF NOT EXISTS idx_rp_messages_persona ON rp_messages(persona_id);
+    CREATE INDEX IF NOT EXISTS idx_rp_scene_messages_scene ON rp_scene_messages(scene_id);
+    CREATE INDEX IF NOT EXISTS idx_rp_scene_members_scene ON rp_scene_members(scene_id);
   `);
+
+  // RP migration: add the "is me" flag to personas created before group scenes.
+  if (!columnExists('rp_personas', 'is_me')) {
+    db.exec('ALTER TABLE rp_personas ADD COLUMN is_me INTEGER NOT NULL DEFAULT 0');
+  }
 
   // Lightweight migrations.
   if (!columnExists('chats', 'system_prompt')) {
@@ -668,7 +698,7 @@ export function setSettingRaw(key: string, value: string): void {
   ).run(key, value);
 }
 
-// ---------- Role-Play personas + messages ----------
+// ---------- Role-Play personas ----------
 
 interface RPPersonaRow {
   id: string;
@@ -677,9 +707,9 @@ interface RPPersonaRow {
   avatar: string;
   greeting: string;
   model: string;
+  is_me: number;
   created_at: number;
   updated_at: number;
-  summarized_count: number;
 }
 
 function mapPersona(r: RPPersonaRow): RPPersona {
@@ -690,9 +720,9 @@ function mapPersona(r: RPPersonaRow): RPPersona {
     avatar: r.avatar,
     greeting: r.greeting,
     model: r.model,
+    isMe: !!r.is_me,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
-    summarizedCount: r.summarized_count,
   };
 }
 
@@ -703,12 +733,18 @@ export function rpGetPersonas(): RPPersona[] {
   return rows.map(mapPersona);
 }
 
+// Only one persona can be "me" at a time — flipping one on clears the rest.
+function clearOtherMe(exceptId: string): void {
+  db.prepare('UPDATE rp_personas SET is_me = 0 WHERE id != ?').run(exceptId);
+}
+
 export function rpCreatePersona(data: {
   name: string;
   description: string;
   avatar?: string;
   greeting?: string;
   model: string;
+  isMe?: boolean;
 }): RPPersona {
   const now = Date.now();
   const row: RPPersonaRow = {
@@ -718,12 +754,12 @@ export function rpCreatePersona(data: {
     avatar: data.avatar || '🎭',
     greeting: data.greeting ?? '',
     model: data.model,
+    is_me: data.isMe ? 1 : 0,
     created_at: now,
     updated_at: now,
-    summarized_count: 0,
   };
   db.prepare(
-    `INSERT INTO rp_personas (id, name, description, avatar, greeting, model, created_at, updated_at, summarized_count)
+    `INSERT INTO rp_personas (id, name, description, avatar, greeting, model, is_me, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     row.id,
@@ -732,56 +768,133 @@ export function rpCreatePersona(data: {
     row.avatar,
     row.greeting,
     row.model,
+    row.is_me,
     row.created_at,
-    row.updated_at,
-    row.summarized_count
+    row.updated_at
   );
+  if (row.is_me) clearOtherMe(row.id);
   return mapPersona(row);
 }
 
 export function rpUpdatePersona(
   id: string,
-  patch: Partial<Pick<RPPersona, 'name' | 'description' | 'avatar' | 'greeting' | 'model'>>
+  patch: Partial<Pick<RPPersona, 'name' | 'description' | 'avatar' | 'greeting' | 'model' | 'isMe'>>
 ): void {
   const cols: string[] = [];
   const vals: (string | number)[] = [];
-  const map: Record<string, string> = {
+  const strMap: Record<string, string> = {
     name: 'name',
     description: 'description',
     avatar: 'avatar',
     greeting: 'greeting',
     model: 'model',
   };
-  for (const [key, col] of Object.entries(map)) {
+  for (const [key, col] of Object.entries(strMap)) {
     const v = (patch as Record<string, unknown>)[key];
     if (typeof v === 'string') {
       cols.push(`${col} = ?`);
       vals.push(v);
     }
   }
+  if (typeof patch.isMe === 'boolean') {
+    cols.push('is_me = ?');
+    vals.push(patch.isMe ? 1 : 0);
+  }
   if (cols.length === 0) return;
   cols.push('updated_at = ?');
   vals.push(Date.now());
   vals.push(id);
   db.prepare(`UPDATE rp_personas SET ${cols.join(', ')} WHERE id = ?`).run(...vals);
+  if (patch.isMe === true) clearOtherMe(id);
 }
 
 export function rpDeletePersona(id: string): void {
   db.prepare('DELETE FROM rp_personas WHERE id = ?').run(id);
 }
 
-export function rpSetSummarized(personaId: string, count: number): void {
-  db.prepare('UPDATE rp_personas SET summarized_count = ? WHERE id = ?').run(count, personaId);
+// ---------- Role-Play scenes (group conversations) ----------
+
+interface RPSceneRow {
+  id: string;
+  name: string;
+  created_at: number;
+  updated_at: number;
+  summarized_count: number;
 }
 
-function touchPersona(id: string): void {
-  db.prepare('UPDATE rp_personas SET updated_at = ? WHERE id = ?').run(Date.now(), id);
+function mapScene(r: RPSceneRow): RPScene {
+  return {
+    id: r.id,
+    name: r.name,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    summarizedCount: r.summarized_count,
+  };
 }
+
+export function rpGetScenes(): RPScene[] {
+  const rows = db.prepare('SELECT * FROM rp_scenes ORDER BY updated_at DESC').all() as RPSceneRow[];
+  return rows.map(mapScene);
+}
+
+export function rpCreateScene(name: string, personaIds: string[]): RPScene {
+  const now = Date.now();
+  const row: RPSceneRow = {
+    id: randomUUID(),
+    name: name || 'New conversation',
+    created_at: now,
+    updated_at: now,
+    summarized_count: 0,
+  };
+  db.prepare(
+    'INSERT INTO rp_scenes (id, name, created_at, updated_at, summarized_count) VALUES (?, ?, ?, ?, ?)'
+  ).run(row.id, row.name, row.created_at, row.updated_at, row.summarized_count);
+  rpSetSceneMembers(row.id, personaIds);
+  return mapScene(row);
+}
+
+export function rpRenameScene(id: string, name: string): void {
+  db.prepare('UPDATE rp_scenes SET name = ?, updated_at = ? WHERE id = ?').run(name, Date.now(), id);
+}
+
+export function rpDeleteScene(id: string): void {
+  db.prepare('DELETE FROM rp_scenes WHERE id = ?').run(id);
+}
+
+export function rpSetSceneSummarized(sceneId: string, count: number): void {
+  db.prepare('UPDATE rp_scenes SET summarized_count = ? WHERE id = ?').run(count, sceneId);
+}
+
+function touchScene(id: string): void {
+  db.prepare('UPDATE rp_scenes SET updated_at = ? WHERE id = ?').run(Date.now(), id);
+}
+
+export function rpGetSceneMembers(sceneId: string): string[] {
+  const rows = db
+    .prepare('SELECT persona_id FROM rp_scene_members WHERE scene_id = ?')
+    .all(sceneId) as { persona_id: string }[];
+  return rows.map((r) => r.persona_id);
+}
+
+export function rpSetSceneMembers(sceneId: string, personaIds: string[]): void {
+  const del = db.prepare('DELETE FROM rp_scene_members WHERE scene_id = ?');
+  const ins = db.prepare(
+    'INSERT OR IGNORE INTO rp_scene_members (scene_id, persona_id) VALUES (?, ?)'
+  );
+  const tx = db.transaction(() => {
+    del.run(sceneId);
+    for (const pid of personaIds) ins.run(sceneId, pid);
+  });
+  tx();
+  touchScene(sceneId);
+}
+
+// ---------- Role-Play scene messages ----------
 
 interface RPMessageRow {
   id: string;
-  persona_id: string;
-  role: string;
+  scene_id: string;
+  sender_persona_id: string | null;
   content: string;
   created_at: number;
 }
@@ -789,44 +902,44 @@ interface RPMessageRow {
 function mapRPMessage(r: RPMessageRow): RPMessage {
   return {
     id: r.id,
-    personaId: r.persona_id,
-    role: r.role as RPMessage['role'],
+    sceneId: r.scene_id,
+    senderPersonaId: r.sender_persona_id,
     content: r.content,
     createdAt: r.created_at,
   };
 }
 
-export function rpGetMessages(personaId: string): RPMessage[] {
+export function rpGetSceneMessages(sceneId: string): RPMessage[] {
   const rows = db
-    .prepare('SELECT * FROM rp_messages WHERE persona_id = ? ORDER BY created_at ASC')
-    .all(personaId) as RPMessageRow[];
+    .prepare('SELECT * FROM rp_scene_messages WHERE scene_id = ? ORDER BY created_at ASC')
+    .all(sceneId) as RPMessageRow[];
   return rows.map(mapRPMessage);
 }
 
-export function rpSaveMessage(msg: {
-  personaId: string;
-  role: RPMessage['role'];
+export function rpSaveSceneMessage(msg: {
+  sceneId: string;
+  senderPersonaId: string | null;
   content: string;
 }): RPMessage {
   const maxRow = db
-    .prepare('SELECT MAX(created_at) AS m FROM rp_messages WHERE persona_id = ?')
-    .get(msg.personaId) as { m: number | null };
+    .prepare('SELECT MAX(created_at) AS m FROM rp_scene_messages WHERE scene_id = ?')
+    .get(msg.sceneId) as { m: number | null };
   const createdAt = Math.max(Date.now(), (maxRow?.m ?? 0) + 1);
   const row: RPMessageRow = {
     id: randomUUID(),
-    persona_id: msg.personaId,
-    role: msg.role,
+    scene_id: msg.sceneId,
+    sender_persona_id: msg.senderPersonaId,
     content: msg.content,
     created_at: createdAt,
   };
   db.prepare(
-    'INSERT INTO rp_messages (id, persona_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
-  ).run(row.id, row.persona_id, row.role, row.content, row.created_at);
-  touchPersona(msg.personaId);
+    'INSERT INTO rp_scene_messages (id, scene_id, sender_persona_id, content, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).run(row.id, row.scene_id, row.sender_persona_id, row.content, row.created_at);
+  touchScene(msg.sceneId);
   return mapRPMessage(row);
 }
 
-export function rpClearMessages(personaId: string): void {
-  db.prepare('DELETE FROM rp_messages WHERE persona_id = ?').run(personaId);
-  db.prepare('UPDATE rp_personas SET summarized_count = 0 WHERE id = ?').run(personaId);
+export function rpClearScene(sceneId: string): void {
+  db.prepare('DELETE FROM rp_scene_messages WHERE scene_id = ?').run(sceneId);
+  db.prepare('UPDATE rp_scenes SET summarized_count = 0 WHERE id = ?').run(sceneId);
 }
