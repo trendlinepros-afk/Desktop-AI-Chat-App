@@ -383,6 +383,10 @@ function registerIpc(): void {
   ipcMain.handle('rp:setSceneMembers', (_e, sceneId: string, personaIds: string[]) =>
     db.rpSetSceneMembers(sceneId, personaIds)
   );
+  ipcMain.handle('rp:getSceneDisabled', (_e, sceneId: string) => db.rpGetSceneDisabled(sceneId));
+  ipcMain.handle('rp:setMemberEnabled', (_e, sceneId: string, personaId: string, enabled: boolean) =>
+    db.rpSetMemberEnabled(sceneId, personaId, enabled)
+  );
   ipcMain.handle('rp:setSceneSummarized', (_e, sceneId: string, count: number) =>
     db.rpSetSceneSummarized(sceneId, count)
   );

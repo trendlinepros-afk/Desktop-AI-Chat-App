@@ -15,6 +15,8 @@ export function RPChatWindow({
   const scenes = useRPStore((s) => s.scenes);
   const activeSceneId = useRPStore((s) => s.activeSceneId);
   const memberIds = useRPStore((s) => s.memberIds);
+  const disabledIds = useRPStore((s) => s.disabledIds);
+  const setMemberEnabled = useRPStore((s) => s.setMemberEnabled);
   const messages = useRPStore((s) => s.messages);
   const personas = useRPStore((s) => s.personas);
   const generating = useRPStore((s) => s.generating);
@@ -84,6 +86,10 @@ export function RPChatWindow({
     }
     if (aiMembers.length === 0) {
       toast('Add at least one character to this conversation', 'error');
+      return;
+    }
+    if (aiMembers.every((p) => disabledIds.includes(p.id))) {
+      toast('Every character is muted — check a name below to let them speak', 'error');
       return;
     }
     setInput('');
@@ -220,20 +226,38 @@ export function RPChatWindow({
         )}
       </div>
 
-      {/* Nudge a specific character to speak */}
+      {/* Per-character speak toggles. Checkbox = allowed to talk; click the name
+          to make them speak right now. */}
       {aiMembers.length > 0 && (
-        <div className="flex flex-wrap gap-1 border-t border-edge bg-chat px-4 py-2">
+        <div className="flex flex-wrap items-center gap-2 border-t border-edge bg-chat px-4 py-2">
           <span className="self-center text-xs text-text-muted">Have someone speak:</span>
-          {aiMembers.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => haveSpeak(p.id)}
-              disabled={generating}
-              className="rounded-full border border-edge px-2 py-0.5 text-xs text-text-muted hover:text-text-primary disabled:opacity-40"
-            >
-              {p.avatar} {p.name}
-            </button>
-          ))}
+          {aiMembers.map((p) => {
+            const enabled = !disabledIds.includes(p.id);
+            return (
+              <div
+                key={p.id}
+                className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
+                  enabled ? 'border-edge' : 'border-edge opacity-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={(e) => setMemberEnabled(p.id, e.target.checked)}
+                  title={enabled ? 'Allowed to speak — uncheck to mute' : 'Muted — check to allow'}
+                  className="accent-accent"
+                />
+                <button
+                  onClick={() => haveSpeak(p.id)}
+                  disabled={generating || !enabled}
+                  title={enabled ? 'Have them speak now' : 'Muted'}
+                  className="text-text-muted hover:text-text-primary disabled:opacity-60"
+                >
+                  {p.avatar} {p.name}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -276,6 +300,22 @@ export function RPChatWindow({
       )}
     </div>
   );
+}
+
+// Render *asterisk-wrapped* spans as italic scene/action narration, the rest as
+// spoken dialogue.
+function renderRP(text: string) {
+  return text.split(/(\*{1,2}[^*]+\*{1,2})/g).map((seg, i) => {
+    const m = /^\*{1,2}([^*]+)\*{1,2}$/.exec(seg);
+    if (m) {
+      return (
+        <em key={i} className="italic text-text-muted">
+          {m[1]}
+        </em>
+      );
+    }
+    return <span key={i}>{seg}</span>;
+  });
 }
 
 function MessageRow({
@@ -346,7 +386,7 @@ function MessageRow({
               mine ? 'bg-user text-white' : 'bg-surface text-text-primary'
             }`}
           >
-            {text}
+            {renderRP(text)}
           </div>
         )}
         {!readOnly && !editing && (
