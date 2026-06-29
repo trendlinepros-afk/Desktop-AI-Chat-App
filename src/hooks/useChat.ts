@@ -213,14 +213,27 @@ async function streamGemini(apiKey: string, opts: SendOptions): Promise<string> 
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// Image models to try, in order. Gemini-native image generation (generateContent
-// with an IMAGE modality) works on standard paid Gemini API keys; Imagen via
-// :predict is often not enabled, so it's the last resort.
-const IMAGE_FALLBACKS = [
-  'gemini-2.0-flash-preview-image-generation',
-  'gemini-2.5-flash-image-preview',
-  'imagen-3.0-generate-002',
-];
+interface ApiModel {
+  name: string; // e.g. "models/imagen-3.0-generate-002"
+  supportedGenerationMethods?: string[];
+}
+
+// Cache the model list per key (it doesn't change within a session).
+let modelCache: { key: string; models: ApiModel[] } | null = null;
+
+async function fetchModels(apiKey: string): Promise<ApiModel[]> {
+  if (modelCache?.key === apiKey) return modelCache.models;
+  const res = await fetch(`${GEMINI_BASE}?pageSize=1000`, {
+    headers: { 'x-goog-api-key': apiKey },
+  });
+  if (!res.ok) throw new Error(`Couldn't list models (${res.status}): ${(await errorDetail(res)).slice(0, 160)}`);
+  const data = (await res.json()) as { models?: ApiModel[] };
+  const models = data.models ?? [];
+  modelCache = { key: apiKey, models };
+  return models;
+}
+
+const bareName = (m: ApiModel) => m.name.replace(/^models\//, '');
 
 async function errorDetail(res: Response): Promise<string> {
   try {
@@ -264,30 +277,77 @@ async function imagenPredict(apiKey: string, model: string, prompt: string): Pro
   return `data:${pred.mimeType || 'image/png'};base64,${pred.bytesBase64Encoded}`;
 }
 
-// Try the preferred model, then fallbacks, until one returns an image. Returns
-// the data URL and the model that actually worked.
+// An image-capable model discovered on the key, plus the method to call it with.
+interface ImageModel {
+  name: string;
+  method: 'predict' | 'generateContent';
+}
+
+// Ask the key which models it actually exposes and keep the image-capable ones.
+// Imagen models use :predict; Gemini "image"/"image-generation" models use
+// :generateContent with responseModalities. Hardcoded ids 404 on many keys
+// because availability varies by key/region/billing — discovery avoids that.
+function imageModelsFrom(models: ApiModel[]): ImageModel[] {
+  const out: ImageModel[] = [];
+  for (const m of models) {
+    const name = bareName(m);
+    const methods = m.supportedGenerationMethods ?? [];
+    if (name.includes('imagen') && methods.includes('predict')) {
+      out.push({ name, method: 'predict' });
+    } else if (
+      /image/.test(name) &&
+      methods.includes('generateContent') &&
+      // Skip vision/understanding models that merely accept images as input.
+      !/vision/.test(name)
+    ) {
+      out.push({ name, method: 'generateContent' });
+    }
+  }
+  // Prefer Gemini-native image generation (cheaper, faster) over Imagen.
+  out.sort((a, b) => {
+    if (a.method !== b.method) return a.method === 'generateContent' ? -1 : 1;
+    return 0;
+  });
+  return out;
+}
+
+// Discover an image-capable model on the user's key and generate. Tries the
+// preferred model first (if it's image-capable), then every other discovered
+// candidate. Returns the data URL and the model that actually worked.
 export async function generateImage(
   apiKey: string,
   preferredModel: string,
   prompt: string
 ): Promise<{ url: string; model: string }> {
-  const order: string[] = [];
-  for (const m of [preferredModel, ...IMAGE_FALLBACKS]) {
-    if (m && !order.includes(m)) order.push(m);
+  if (!apiKey) throw new Error('No Gemini API key set. Add one in Settings.');
+
+  const models = await fetchModels(apiKey);
+  const candidates = imageModelsFrom(models);
+
+  if (candidates.length === 0) {
+    throw new Error(
+      'This Gemini key exposes no image-generation models. Image generation needs a paid/billing-enabled key (and image models enabled for your region).'
+    );
   }
+
+  // Try the preferred model first if it's actually image-capable on this key.
+  const preferred = candidates.find((c) => c.name === preferredModel);
+  const order = preferred ? [preferred, ...candidates.filter((c) => c !== preferred)] : candidates;
+
   const errors: string[] = [];
-  for (const model of order) {
+  for (const { name, method } of order) {
     try {
-      const url = model.startsWith('imagen')
-        ? await imagenPredict(apiKey, model, prompt)
-        : await geminiGenerateImage(apiKey, model, prompt);
-      return { url, model };
+      const url =
+        method === 'predict'
+          ? await imagenPredict(apiKey, name, prompt)
+          : await geminiGenerateImage(apiKey, name, prompt);
+      return { url, model: name };
     } catch (err) {
       errors.push((err as Error).message);
     }
   }
   throw new Error(
-    `No image model available on this key. Tried: ${errors.join(' | ')}. Image generation needs a paid/billing-enabled Gemini key.`
+    `Tried ${order.length} image model(s) on this key but all failed: ${errors.join(' | ')}`
   );
 }
 
