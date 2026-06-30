@@ -29,6 +29,17 @@ function trimHistory(history: Message[]): Message[] {
   return history.slice(history.length - MAX_HISTORY_MESSAGES);
 }
 
+// Strip the junk models tend to wrap a generated title in (quotes, a "Title:"
+// preface, markdown, trailing punctuation, stray newlines).
+function cleanTitle(raw: string): string {
+  return raw
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/^\s*(?:chat\s+)?title\s*[:\-–]\s*/i, '')
+    .replace(/^["'`*“”]+|["'`*“”]+$/g, '')
+    .replace(/[.!?,;:]+$/g, '')
+    .trim();
+}
+
 export function useSend() {
   const { sendMessage, stop, isStreaming } = useChat();
   const { buildBrainContext } = useVaultSearch();
@@ -135,20 +146,34 @@ export function useSend() {
       // for delete / regenerate / branch to target the right rows).
       await useChatStore.getState().reloadMessages(chat.id);
 
-      if (autoTitleFrom && (chat.title === 'New Chat' || !chat.title)) {
+      // Auto-name a brand-new chat from its first exchange (like Gemini/ChatGPT).
+      // Always lands on a real title: if the model returns nothing usable, derive
+      // one from the first user message instead of leaving it "New Chat".
+      const needsTitle = chat.title === 'New Chat' || !chat.title;
+      const seed = (autoTitleFrom ?? '').trim();
+      const reply = finalText && !finalText.startsWith('⚠️') ? finalText : '';
+      if (needsTitle && (seed || reply)) {
+        let title = '';
         try {
-          const titlePrompt = `Generate a concise 3-6 word title (no quotes, no trailing punctuation) for a conversation that starts with this user message:\n\n"${autoTitleFrom.slice(
-            0,
-            400
-          )}"`;
-          const title = (await completeText(chat.provider, chat.modelVersion, settings, titlePrompt))
-            .trim()
-            .replace(/^["']|["']$/g, '')
-            .slice(0, 60);
-          if (title) await renameChat(chat.id, title);
+          const convo = `User: ${seed.slice(0, 500)}${reply ? `\nAssistant: ${reply.slice(0, 500)}` : ''}`;
+          const titlePrompt =
+            `Create a short, specific title (3 to 6 words) summarizing this conversation. ` +
+            `Reply with ONLY the title text — no quotes, no preface, no trailing punctuation.\n\n${convo}`;
+          title = cleanTitle(
+            await completeText(chat.provider, chat.modelVersion, settings, titlePrompt)
+          ).slice(0, 60);
         } catch {
-          await renameChat(chat.id, autoTitleFrom.slice(0, 40));
+          title = '';
         }
+        // Fallback: first few words of the user's message (or the reply).
+        if (!title) {
+          title = cleanTitle(seed || reply)
+            .split(/\s+/)
+            .slice(0, 8)
+            .join(' ')
+            .slice(0, 60);
+        }
+        if (title) await renameChat(chat.id, title);
       }
 
       loadNotes();
@@ -220,7 +245,10 @@ export function useSend() {
       if (history.length === 0) return;
       const context = await buildContext(chat, history);
       const assembled = [...context, ...trimHistory(history)];
-      await streamReply(chat, assembled);
+      // Still let a never-titled chat get named (e.g. after declining an image offer).
+      const lastUser = [...history].reverse().find((m) => m.role === 'user');
+      const seed = lastUser?.content.find((p) => p.type === 'text')?.text;
+      await streamReply(chat, assembled, seed);
     },
     [buildContext, streamReply]
   );
