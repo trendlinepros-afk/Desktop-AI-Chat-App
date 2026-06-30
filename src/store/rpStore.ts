@@ -61,6 +61,7 @@ interface RPState {
   editMessage: (id: string, content: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
   regenerateLast: () => Promise<void>;
+  regenerateAsRepeat: (messageId: string) => Promise<void>;
 
   mePersona: () => RPPersona | undefined;
   personaById: (id: string | null) => RPPersona | undefined;
@@ -276,6 +277,29 @@ export const useRPStore = create<RPState>((set, get) => ({
     set({ generating: false, speakingId: null });
   },
 
+  // "Repeated Message": the user flags a character line as too repetitive. Re-roll
+  // that exact message in place, telling the model what it said so it avoids it.
+  regenerateAsRepeat: async (messageId) => {
+    const sceneId = get().activeSceneId;
+    if (!sceneId || get().generating) return;
+    const msgs = get().messages;
+    const idx = msgs.findIndex((m) => m.id === messageId);
+    if (idx === -1) return;
+    const target = msgs[idx];
+    const persona = get().personaById(target.senderPersonaId);
+    if (!persona || persona.isMe || target.kind === 'director') return; // characters only
+    cancelled = false;
+    set({ generating: true, speakingId: persona.id });
+    const prior = msgs.slice(0, idx).slice(-MAX_HISTORY);
+    const nudge =
+      `(Your previous reply here was: "${target.content.slice(0, 400)}". The user flagged it as ` +
+      `too repetitive — too close to an earlier message. Write a COMPLETELY different reply: fresh ` +
+      `wording and a new beat that advances the scene. Do NOT reuse that phrasing and do NOT ` +
+      `re-describe the setting.)`;
+    await generateFor(get, set, sceneId, persona, nudge, { history: prior, replaceId: target.id });
+    set({ generating: false, speakingId: null });
+  },
+
   summarizeNow: async (sceneId) => {
     const scene = get().scenes.find((s) => s.id === sceneId);
     if (!scene || get().summarizing) return;
@@ -395,7 +419,8 @@ async function generateFor(
   set: Set,
   sceneId: string,
   persona: RPPersona,
-  nudge?: string
+  nudge?: string,
+  opts?: { history?: RPMessage[]; replaceId?: string }
 ): Promise<string> {
   const settings = useSettingsStore.getState().settings;
   const toast = useUIStore.getState().toast;
@@ -446,7 +471,7 @@ async function generateFor(
       `you don't forget — treat it as things you remember):\n${trimmed.trim()}`;
   }
 
-  const history = get().messages.slice(-MAX_HISTORY);
+  const history = opts?.history ?? get().messages.slice(-MAX_HISTORY);
   const turns: RPTurn[] = [{ role: 'system', content: system }];
   for (const m of history) {
     if (m.kind === 'director') {
@@ -476,12 +501,24 @@ async function generateFor(
     toast((err as Error).message, 'error');
   }
 
-  const msg = await window.polyglot.rpSaveSceneMessage({
-    sceneId,
-    senderPersonaId: persona.id,
-    content: text,
-  });
-  if (get().activeSceneId === sceneId) set({ messages: [...get().messages, msg] });
+  if (opts?.replaceId) {
+    // Regenerate an existing message in place (keeps later messages).
+    await window.polyglot.rpUpdateSceneMessage(opts.replaceId, text);
+    if (get().activeSceneId === sceneId) {
+      set({
+        messages: get().messages.map((m) =>
+          m.id === opts.replaceId ? { ...m, content: text } : m
+        ),
+      });
+    }
+  } else {
+    const msg = await window.polyglot.rpSaveSceneMessage({
+      sceneId,
+      senderPersonaId: persona.id,
+      content: text,
+    });
+    if (get().activeSceneId === sceneId) set({ messages: [...get().messages, msg] });
+  }
   return text;
 }
 
