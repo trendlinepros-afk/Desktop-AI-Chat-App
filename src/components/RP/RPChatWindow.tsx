@@ -34,6 +34,7 @@ export function RPChatWindow({
   const editMessage = useRPStore((s) => s.editMessage);
   const deleteMessage = useRPStore((s) => s.deleteMessage);
   const regenerateLast = useRPStore((s) => s.regenerateLast);
+  const regenerateAsRepeat = useRPStore((s) => s.regenerateAsRepeat);
   const grokKey = useSettingsStore((s) => s.settings.grokApiKey);
   const rpVaultPath = useSettingsStore((s) => s.settings.rpVaultPath);
   const toast = useUIStore((s) => s.toast);
@@ -234,6 +235,7 @@ export function RPChatWindow({
                 if (confirm('Delete this message?')) void deleteMessage(m.id);
               }}
               onRegen={() => regenerateLast()}
+              onRepeat={!mine && !generating ? () => regenerateAsRepeat(m.id) : undefined}
               onGuide={() => setGuideOpen(true)}
             />
           );
@@ -372,6 +374,7 @@ function MessageRow({
   onEdit,
   onDelete,
   onRegen,
+  onRepeat,
   onGuide,
 }: {
   text: string;
@@ -384,6 +387,7 @@ function MessageRow({
   onEdit?: (text: string) => void;
   onDelete?: () => void;
   onRegen?: () => void;
+  onRepeat?: () => void;
   onGuide?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -450,6 +454,15 @@ function MessageRow({
             {canRegen && onRegen && (
               <button onClick={onRegen} className="hover:text-text-primary" title="Regenerate">
                 🔄 Redo
+              </button>
+            )}
+            {onRepeat && (
+              <button
+                onClick={onRepeat}
+                className="hover:text-text-primary"
+                title="This reply was too repetitive — regenerate it differently"
+              >
+                ♻️ Repeated message
               </button>
             )}
             {onGuide && (
