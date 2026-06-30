@@ -411,17 +411,18 @@ async function generateFor(
     `You are "${persona.name}". Stay fully in character, speaking in the first person as ` +
     `${persona.name}. Never break character or mention that you are an AI.\n\n` +
     `Character:\n${persona.description.trim()}\n\n` +
-    `Write in an immersive, novel-like role-play style — never dialogue only. Narrate ` +
-    `${persona.name}'s actions, body language, expressions, and the scene/setting in the third ` +
-    `person wrapped in *asterisks*, and write spoken words as plain text. Every reply must include ` +
-    `at least one *narration* of what ${persona.name} is doing or how the scene looks, not just ` +
-    `speech.\nFor example:\n*Beth walks into the room, confident, wearing a pink shirt and skirt, ` +
-    `and smiles* Hello Adam, how are you?\n\n` +
-    `Crucially, PROGRESS the story every turn. Do not repeat, echo, or paraphrase what you or ` +
-    `another character already said. React to the latest message, then add something NEW — a fresh ` +
-    `action, decision, question, revelation, or change in the scene that moves things forward. ` +
-    `Never stall, agree-and-restate, or loop back to earlier points. Keep replies fairly short ` +
-    `(1-4 sentences) to keep momentum.`;
+    `Write in an immersive, novel-like role-play style — blend brief *asterisk* narration with ` +
+    `spoken dialogue (plain text). Narrate ${persona.name}'s NEW actions, gestures, expressions ` +
+    `and feelings in the moment.\nFor example:\n*Beth steps closer, her smile fading into ` +
+    `something guarded* And what exactly do you mean by that?\n\n` +
+    `CRITICAL — do not re-describe the scene. The setting, the room, the surroundings, the ` +
+    `weather, and each character's appearance/outfit are ALREADY established; never restate or ` +
+    `re-describe them once mentioned, and never open a reply by re-establishing the scene. Assume ` +
+    `the reader remembers it. Each turn, narrate ONLY what CHANGES since the last message — one ` +
+    `small movement, a shift in tone or emotion, or a new beat — then speak. Never repeat, echo, ` +
+    `or rephrase narration or dialogue already given (yours or another character's). React to the ` +
+    `latest message and move the story forward in small increments. Keep replies short (1-3 ` +
+    `sentences) to keep momentum.`;
   if (others.length > 0) {
     system +=
       `\n\nThis is a live group conversation. Other characters present: ` +
