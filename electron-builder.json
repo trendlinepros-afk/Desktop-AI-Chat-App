@@ -5,7 +5,7 @@
     "output": "release",
     "buildResources": "build"
   },
-  "files": ["dist", "dist-electron"],
+  "files": ["dist", "dist-electron", "build/icon.png"],
   "asarUnpack": ["**/node_modules/better-sqlite3/**"],
   "publish": [
     {
@@ -17,16 +17,22 @@
   ],
   "mac": {
     "target": ["dmg"],
-    "category": "public.app-category.productivity"
+    "category": "public.app-category.productivity",
+    "icon": "build/icon.png"
   },
   "win": {
-    "target": ["nsis"]
+    "target": ["nsis"],
+    "icon": "build/icon.png"
   },
   "nsis": {
-    "deleteAppDataOnUninstall": false
+    "deleteAppDataOnUninstall": false,
+    "createDesktopShortcut": "always",
+    "createStartMenuShortcut": true,
+    "shortcutName": "WICKED"
   },
   "linux": {
     "target": ["AppImage"],
-    "category": "Utility"
+    "category": "Utility",
+    "icon": "build/icon.png"
   }
 }

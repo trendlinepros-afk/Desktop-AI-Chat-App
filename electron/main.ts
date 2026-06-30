@@ -34,6 +34,13 @@ function resolvePreload(): string {
   return path.join(MAIN_DIST, 'preload.mjs');
 }
 
+// The window/taskbar icon (bundled via electron-builder `files`). On Windows the
+// OS also uses the exe icon; this covers dev and the Linux/runtime window icon.
+function resolveIcon(): string | undefined {
+  const candidate = path.join(process.env.APP_ROOT ?? '', 'build', 'icon.png');
+  return fs.existsSync(candidate) ? candidate : undefined;
+}
+
 function createWindow(): void {
   win = new BrowserWindow({
     width: 1400,
@@ -42,6 +49,7 @@ function createWindow(): void {
     minHeight: 600,
     backgroundColor: '#0a0a0b',
     title: 'WICKED',
+    icon: resolveIcon(),
     webPreferences: {
       preload: resolvePreload(),
       contextIsolation: true,
