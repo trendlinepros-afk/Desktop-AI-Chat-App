@@ -473,14 +473,22 @@ function MessageRow({
                 <button
                   onClick={() => onRate(rating === 'up' ? '' : 'up')}
                   title="Good reply"
-                  className={rating === 'up' ? 'text-green-400' : 'hover:text-text-primary'}
+                  className={`rounded px-1 leading-none transition ${
+                    rating === 'up'
+                      ? 'bg-green-500/25 ring-1 ring-green-500/60'
+                      : 'opacity-40 hover:opacity-100'
+                  }`}
                 >
                   👍
                 </button>
                 <button
                   onClick={() => onRate(rating === 'down' ? '' : 'down')}
                   title="Bad reply"
-                  className={rating === 'down' ? 'text-red-400' : 'hover:text-text-primary'}
+                  className={`rounded px-1 leading-none transition ${
+                    rating === 'down'
+                      ? 'bg-red-500/25 ring-1 ring-red-500/60'
+                      : 'opacity-40 hover:opacity-100'
+                  }`}
                 >
                   👎
                 </button>
