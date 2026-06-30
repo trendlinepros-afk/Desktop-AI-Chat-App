@@ -48,6 +48,7 @@ export function RPChatWindow({
   const [titleEditing, setTitleEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const scene = scenes.find((s) => s.id === activeSceneId) ?? null;
   const byId = (id: string | null): RPPersona | undefined =>
@@ -59,6 +60,11 @@ export function RPChatWindow({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, generating]);
+
+  // Focus the message box when you open/switch a conversation so you can just type.
+  useEffect(() => {
+    if (activeSceneId) inputRef.current?.focus();
+  }, [activeSceneId]);
 
   if (!scene) {
     return (
@@ -294,10 +300,28 @@ export function RPChatWindow({
         </div>
       )}
 
-      {/* Input */}
-      <div className="border-t border-edge bg-chat px-4 py-3">
-        <div className="flex items-end gap-2">
+      {/* Input. Clicking anywhere in the bar focuses the textarea so it's an easy
+          target (not just the thin one-row field). */}
+      <div
+        className="border-t border-edge bg-chat px-4 py-3"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) {
+            e.preventDefault();
+            inputRef.current?.focus();
+          }
+        }}
+      >
+        <div
+          className="flex items-end gap-2"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              inputRef.current?.focus();
+            }
+          }}
+        >
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -307,8 +331,8 @@ export function RPChatWindow({
               }
             }}
             placeholder={me ? `Message as ${me.name}…` : 'Type your message…'}
-            rows={1}
-            className="max-h-40 flex-1 resize-none rounded-xl border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+            rows={2}
+            className="max-h-40 min-h-[3rem] flex-1 resize-none rounded-xl border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
           />
           <button
             onClick={async () => {
