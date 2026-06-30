@@ -92,10 +92,6 @@ export function RPChatWindow({
       toast('Add at least one character to this conversation', 'error');
       return;
     }
-    if (aiMembers.every((p) => disabledIds.includes(p.id))) {
-      toast('Every character is muted — check a name below to let them speak', 'error');
-      return;
-    }
     setInput('');
     void sendUser(text);
   };
@@ -252,32 +248,38 @@ export function RPChatWindow({
         )}
       </div>
 
-      {/* Per-character speak toggles. Checkbox = allowed to talk; click the name
-          to make them speak right now. */}
+      {/* Per-character controls. The checkbox enables AUTOMATIC talking; clicking
+          a name always makes that character speak now, even with auto off. */}
       {aiMembers.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-t border-edge bg-chat px-4 py-2">
-          <span className="self-center text-xs text-text-muted">Have someone speak:</span>
+          <span className="self-center text-xs text-text-muted">
+            Click a name to speak · check = auto-reply:
+          </span>
           {aiMembers.map((p) => {
-            const enabled = !disabledIds.includes(p.id);
+            const auto = !disabledIds.includes(p.id);
             return (
               <div
                 key={p.id}
-                className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
-                  enabled ? 'border-edge' : 'border-edge opacity-50'
-                }`}
+                className="flex items-center gap-1 rounded-full border border-edge px-2 py-0.5 text-xs"
               >
                 <input
                   type="checkbox"
-                  checked={enabled}
+                  checked={auto}
                   onChange={(e) => setMemberEnabled(p.id, e.target.checked)}
-                  title={enabled ? 'Allowed to speak — uncheck to mute' : 'Muted — check to allow'}
+                  title={
+                    auto
+                      ? 'Auto-reply ON — uncheck to stop automatic talking'
+                      : 'Auto-reply OFF — check to let them talk automatically'
+                  }
                   className="accent-accent"
                 />
                 <button
                   onClick={() => haveSpeak(p.id)}
-                  disabled={generating || !enabled}
-                  title={enabled ? 'Have them speak now' : 'Muted'}
-                  className="text-text-muted hover:text-text-primary disabled:opacity-60"
+                  disabled={generating}
+                  title={`Have ${p.name} speak now`}
+                  className={`hover:text-text-primary disabled:opacity-60 ${
+                    auto ? 'text-text-muted' : 'text-text-muted/70'
+                  }`}
                 >
                   {p.avatar} {p.name}
                 </button>
