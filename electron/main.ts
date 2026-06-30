@@ -442,33 +442,55 @@ function registerIpc(): void {
       options?: { temperature?: number; presencePenalty?: number; frequencyPenalty?: number }
     ) => {
       if (!apiKey) throw new Error('No Grok API key set. Add one in RP Settings.');
-      const body: Record<string, unknown> = { model, messages };
-      if (options?.temperature !== undefined) body.temperature = options.temperature;
-      if (options?.presencePenalty !== undefined) body.presence_penalty = options.presencePenalty;
+
+      const temp = options?.temperature !== undefined ? { temperature: options.temperature } : {};
+      const penalties: Record<string, number> = {};
+      if (options?.presencePenalty !== undefined) penalties.presence_penalty = options.presencePenalty;
       if (options?.frequencyPenalty !== undefined)
-        body.frequency_penalty = options.frequencyPenalty;
-      let res: Response;
-      try {
-        res = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(body),
-        });
-      } catch (err) {
-        throw new Error(`Couldn't reach the Grok API: ${(err as Error).message}`);
-      }
-      if (!res.ok) {
-        let detail = '';
-        try {
-          const j = (await res.json()) as { error?: { message?: string } | string };
-          detail = typeof j.error === 'string' ? j.error : j.error?.message || '';
-        } catch {
-          detail = (await res.text().catch(() => '')) || '';
+        penalties.frequency_penalty = options.frequencyPenalty;
+
+      // Try richest first, then progressively drop sampling params some models
+      // (e.g. grok-3) reject with a 400. De-duplicated so we never retry identically.
+      const candidates: Record<string, unknown>[] = [];
+      const seen = new Set<string>();
+      for (const extra of [{ ...temp, ...penalties }, { ...temp }, {}]) {
+        const body = { model, messages, ...extra };
+        const key = JSON.stringify(Object.keys(extra).sort());
+        if (!seen.has(key)) {
+          seen.add(key);
+          candidates.push(body);
         }
-        throw new Error(`Grok API error (${res.status}): ${detail.slice(0, 200)}`);
+      }
+
+      const detailOf = async (r: Response): Promise<string> => {
+        try {
+          const j = (await r.json()) as { error?: { message?: string } | string };
+          return typeof j.error === 'string' ? j.error : j.error?.message || '';
+        } catch {
+          return (await r.text().catch(() => '')) || '';
+        }
+      };
+
+      let res: Response | null = null;
+      let detail = '';
+      for (let i = 0; i < candidates.length; i++) {
+        try {
+          res = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
+            body: JSON.stringify(candidates[i]),
+          });
+        } catch (err) {
+          throw new Error(`Couldn't reach the Grok API: ${(err as Error).message}`);
+        }
+        if (res.ok) break;
+        detail = await detailOf(res);
+        // Only a 400 about an unsupported sampling param is worth retrying plainer.
+        if (res.status !== 400 || i === candidates.length - 1) break;
+      }
+
+      if (!res || !res.ok) {
+        throw new Error(`Grok API error (${res?.status ?? '?'}): ${detail.slice(0, 200)}`);
       }
       const data = (await res.json()) as {
         choices?: { message?: { content?: string } }[];
