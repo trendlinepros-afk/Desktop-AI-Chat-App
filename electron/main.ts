@@ -412,6 +412,9 @@ function registerIpc(): void {
     db.rpUpdateSceneMessage(id, content)
   );
   ipcMain.handle('rp:deleteSceneMessage', (_e, id: string) => db.rpDeleteSceneMessage(id));
+  ipcMain.handle('rp:setMessageRating', (_e, id: string, rating: string) =>
+    db.rpSetMessageRating(id, rating)
+  );
   ipcMain.handle('rp:clearScene', (_e, sceneId: string) => {
     db.rpClearScene(sceneId);
     safeVault(() => rpMemory.clearMemory(sceneId), undefined);

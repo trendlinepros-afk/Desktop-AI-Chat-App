@@ -115,6 +115,7 @@ const api: WickedAPI = {
   rpUpdateSceneMessage: (id, content) =>
     ipcRenderer.invoke('rp:updateSceneMessage', id, content),
   rpDeleteSceneMessage: (id) => ipcRenderer.invoke('rp:deleteSceneMessage', id),
+  rpSetMessageRating: (id, rating) => ipcRenderer.invoke('rp:setMessageRating', id, rating),
   rpClearScene: (sceneId) => ipcRenderer.invoke('rp:clearScene', sceneId),
   rpReadMemory: (sceneId) => ipcRenderer.invoke('rp:readMemory', sceneId),
   rpAppendMemory: (sceneId, sceneName, summary) =>
