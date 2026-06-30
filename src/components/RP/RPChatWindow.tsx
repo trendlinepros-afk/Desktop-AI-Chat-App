@@ -407,7 +407,7 @@ function MessageRow({
   return (
     <div className={`group flex gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
       {!mine && <Avatar emoji={avatar} image={avatarImage} size={28} className="mt-1" />}
-      <div className="max-w-[75%]">
+      <div className={editing ? 'w-[560px] max-w-[90%]' : 'max-w-[75%]'}>
         {!mine && <div className="mb-0.5 text-xs text-text-muted">{name}</div>}
         {editing ? (
           <div className="rounded-2xl border border-accent bg-surface p-2">
@@ -415,8 +415,8 @@ function MessageRow({
               autoFocus
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              rows={Math.min(10, Math.max(2, draft.split('\n').length))}
-              className="w-full resize-y rounded-lg bg-transparent px-1 text-sm outline-none"
+              rows={Math.min(20, Math.max(6, draft.split('\n').length + 1))}
+              className="min-h-[9rem] w-full resize-y rounded-lg bg-transparent px-2 py-1 text-sm leading-relaxed outline-none"
             />
             <div className="mt-1 flex justify-end gap-2">
               <button
