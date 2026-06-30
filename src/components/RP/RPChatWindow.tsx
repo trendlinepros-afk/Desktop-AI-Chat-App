@@ -35,6 +35,9 @@ export function RPChatWindow({
   const deleteMessage = useRPStore((s) => s.deleteMessage);
   const regenerateLast = useRPStore((s) => s.regenerateLast);
   const regenerateAsRepeat = useRPStore((s) => s.regenerateAsRepeat);
+  const setRating = useRPStore((s) => s.setRating);
+  const suggestReply = useRPStore((s) => s.suggestReply);
+  const suggesting = useRPStore((s) => s.suggesting);
   const grokKey = useSettingsStore((s) => s.settings.grokApiKey);
   const rpVaultPath = useSettingsStore((s) => s.settings.rpVaultPath);
   const toast = useUIStore((s) => s.toast);
@@ -233,6 +236,8 @@ export function RPChatWindow({
               onRegen={() => regenerateLast()}
               onRepeat={!mine && !generating ? () => regenerateAsRepeat(m.id) : undefined}
               onGuide={() => setGuideOpen(true)}
+              rating={m.rating}
+              onRate={!mine ? (r) => setRating(m.id, r) : undefined}
             />
           );
         })}
@@ -305,6 +310,17 @@ export function RPChatWindow({
             rows={1}
             className="max-h-40 flex-1 resize-none rounded-xl border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
           />
+          <button
+            onClick={async () => {
+              const text = await suggestReply();
+              if (text) setInput(text);
+            }}
+            disabled={generating || suggesting}
+            title="Let AI draft your reply from the conversation — you can edit it before sending"
+            className="rounded-xl border border-accent/40 px-3 py-2 text-sm text-accent hover:bg-accent/10 disabled:opacity-50"
+          >
+            {suggesting ? '…' : '✨ Suggest'}
+          </button>
           {generating ? (
             <button
               onClick={stop}
@@ -378,6 +394,8 @@ function MessageRow({
   onRegen,
   onRepeat,
   onGuide,
+  rating,
+  onRate,
 }: {
   text: string;
   mine: boolean;
@@ -391,6 +409,8 @@ function MessageRow({
   onRegen?: () => void;
   onRepeat?: () => void;
   onGuide?: () => void;
+  rating?: 'up' | 'down' | '';
+  onRate?: (rating: 'up' | 'down' | '') => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
@@ -444,10 +464,28 @@ function MessageRow({
         )}
         {!readOnly && !editing && (
           <div
-            className={`mt-0.5 flex gap-2 text-[11px] text-text-muted opacity-0 transition group-hover:opacity-100 ${
-              mine ? 'justify-end' : 'justify-start'
-            }`}
+            className={`mt-0.5 flex items-center gap-2 text-[11px] text-text-muted transition ${
+              rating ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            } ${mine ? 'justify-end' : 'justify-start'}`}
           >
+            {onRate && (
+              <>
+                <button
+                  onClick={() => onRate(rating === 'up' ? '' : 'up')}
+                  title="Good reply"
+                  className={rating === 'up' ? 'text-green-400' : 'hover:text-text-primary'}
+                >
+                  👍
+                </button>
+                <button
+                  onClick={() => onRate(rating === 'down' ? '' : 'down')}
+                  title="Bad reply"
+                  className={rating === 'down' ? 'text-red-400' : 'hover:text-text-primary'}
+                >
+                  👎
+                </button>
+              </>
+            )}
             {onEdit && (
               <button onClick={startEdit} className="hover:text-text-primary" title="Edit / tweak">
                 ✏️ Edit

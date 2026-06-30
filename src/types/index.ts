@@ -124,6 +124,7 @@ export interface RPMessage {
   senderPersonaId: string | null; // null = a line typed by you (the human)
   content: string;
   kind: 'chat' | 'director'; // 'director' = an out-of-character steer you wrote
+  rating: 'up' | 'down' | ''; // your thumbs feedback on this message
   createdAt: number;
 }
 
@@ -329,6 +330,7 @@ export interface WickedAPI {
   }): Promise<RPMessage>;
   rpUpdateSceneMessage(id: string, content: string): Promise<void>;
   rpDeleteSceneMessage(id: string): Promise<void>;
+  rpSetMessageRating(id: string, rating: 'up' | 'down' | ''): Promise<void>;
   rpClearScene(sceneId: string): Promise<void>;
 
   // RP memory — markdown files in a folder kept separate from the Brain vault

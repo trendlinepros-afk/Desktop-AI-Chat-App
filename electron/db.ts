@@ -162,6 +162,7 @@ export function initDb(): void {
       sender_persona_id TEXT,
       content TEXT NOT NULL,
       kind TEXT NOT NULL DEFAULT 'chat',
+      rating TEXT NOT NULL DEFAULT '',
       created_at INTEGER NOT NULL
     );
 
@@ -191,6 +192,9 @@ export function initDb(): void {
   }
   if (!columnExists('rp_scene_messages', 'kind')) {
     db.exec("ALTER TABLE rp_scene_messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'chat'");
+  }
+  if (!columnExists('rp_scene_messages', 'rating')) {
+    db.exec("ALTER TABLE rp_scene_messages ADD COLUMN rating TEXT NOT NULL DEFAULT ''");
   }
 
   // Lightweight migrations.
@@ -1057,6 +1061,7 @@ interface RPMessageRow {
   sender_persona_id: string | null;
   content: string;
   kind: string | null;
+  rating: string | null;
   created_at: number;
 }
 
@@ -1067,6 +1072,7 @@ function mapRPMessage(r: RPMessageRow): RPMessage {
     senderPersonaId: r.sender_persona_id,
     content: r.content,
     kind: (r.kind as RPMessage['kind']) ?? 'chat',
+    rating: (r.rating as RPMessage['rating']) ?? '',
     createdAt: r.created_at,
   };
 }
@@ -1094,6 +1100,7 @@ export function rpSaveSceneMessage(msg: {
     sender_persona_id: msg.senderPersonaId,
     content: msg.content,
     kind: msg.kind ?? 'chat',
+    rating: '',
     created_at: createdAt,
   };
   db.prepare(
@@ -1101,6 +1108,10 @@ export function rpSaveSceneMessage(msg: {
   ).run(row.id, row.scene_id, row.sender_persona_id, row.content, row.kind, row.created_at);
   touchScene(msg.sceneId);
   return mapRPMessage(row);
+}
+
+export function rpSetMessageRating(id: string, rating: string): void {
+  db.prepare('UPDATE rp_scene_messages SET rating = ? WHERE id = ?').run(rating, id);
 }
 
 export function rpClearScene(sceneId: string): void {
