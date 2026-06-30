@@ -250,13 +250,9 @@ export function SettingsModal() {
             </button>
           </Section>
 
-          {/* Role-Play (RP) — a separate side of the app, launched from here */}
-          <Section title="Role-Play (RP)">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-text-muted">
-                A separate role-playing chatbot: build personas of people you can talk to, powered
-                by the Grok API, with its own memory kept apart from the main app.
-              </p>
+          {/* Optimizations — opens the separate RP side of the app */}
+          <Section title="Optimizations">
+            <div className="flex items-center justify-end gap-3">
               <button
                 onClick={() => {
                   setOpen(false);
@@ -264,7 +260,7 @@ export function SettingsModal() {
                 }}
                 className="shrink-0 rounded-lg border border-accent bg-accent/10 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/20"
               >
-                🎭 RP
+                OPTO
               </button>
             </div>
           </Section>
