@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useChatStore } from '../../store/chatStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useAgentStore } from '../../store/agentStore';
 import { ModelSelector } from '../ModelSelector/ModelSelector';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
@@ -17,6 +18,8 @@ export function ChatWindow() {
   const activeChatId = useChatStore((s) => s.activeChatId);
   const chats = useChatStore((s) => s.chats);
   const setNoMemory = useChatStore((s) => s.setNoMemory);
+  const setAgentPersona = useChatStore((s) => s.setAgentPersona);
+  const personas = useAgentStore((s) => s.personas);
   const vaultPath = useSettingsStore((s) => s.settings.vaultPath);
   const [linkOpen, setLinkOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -55,6 +58,25 @@ export function ChatWindow() {
       {/* Chat sub-header: title, link, end & review */}
       <div className="flex items-center gap-2 border-b border-edge bg-chat px-4 py-2">
         <h2 className="flex-1 truncate text-sm font-medium">{chat.title}</h2>
+        {personas.length > 0 && (
+          <select
+            value={chat.agentPersonaId ?? ''}
+            onChange={(e) => setAgentPersona(chat.id, e.target.value || null)}
+            title="Answer as a brain persona (grounded in its documents)"
+            className={`max-w-[11rem] truncate rounded-md border px-2 py-1 text-sm outline-none ${
+              chat.agentPersonaId
+                ? 'border-accent bg-accent/10 text-accent'
+                : 'border-edge bg-surface text-text-muted'
+            }`}
+          >
+            <option value="">🧠 No persona</option>
+            {personas.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.avatar} {p.name}
+              </option>
+            ))}
+          </select>
+        )}
         <UsageMeter chat={chat} />
         <button
           onClick={() => setNoMemory(chat.id, !chat.noMemory)}

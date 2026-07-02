@@ -18,6 +18,26 @@ export interface Chat {
   systemPrompt: string;
   noMemory: boolean; // opt out of scheduled auto-commit to memory
   lastCommittedAt: number; // when this chat was last saved to the vault
+  agentPersonaId: string | null; // bound "brain" persona this chat answers as
+}
+
+// A vault-backed persona ("brain"): answers as a specific person, grounded in the
+// markdown docs inside a chosen Obsidian folder.
+export interface AgentPersona {
+  id: string;
+  name: string;
+  avatar: string;
+  systemPrompt: string; // instructs the model to embody the person
+  vaultPath: string; // folder holding this brain's markdown documents
+  createdAt: number;
+  updatedAt: number;
+}
+
+// A markdown document read from a brain folder.
+export interface BrainDoc {
+  path: string;
+  title: string;
+  body: string;
 }
 
 export interface DeletedChat extends Chat {
@@ -200,6 +220,7 @@ export interface WickedAPI {
   updateChatModel(id: string, provider: Provider, modelVersion: string): Promise<void>;
   deleteChat(id: string): Promise<void>;
   updateChatSystemPrompt(id: string, prompt: string): Promise<void>;
+  updateChatAgentPersona(id: string, personaId: string | null): Promise<void>;
   branchChat(id: string, uptoCreatedAt: number): Promise<Chat | null>;
   setChatNoMemory(id: string, noMemory: boolean): Promise<void>;
   setChatCommitted(id: string, ts: number): Promise<void>;
@@ -282,6 +303,23 @@ export interface WickedAPI {
 
   // Model discovery (OpenAI/DeepSeek listed in the main process to avoid CORS)
   listOpenAICompatModels(baseUrl: string, apiKey: string): Promise<string[]>;
+
+  // Agent personas (vault-backed brains)
+  agentGetPersonas(): Promise<AgentPersona[]>;
+  agentCreatePersona(data: {
+    name: string;
+    avatar?: string;
+    systemPrompt: string;
+    vaultPath: string;
+  }): Promise<AgentPersona>;
+  agentUpdatePersona(
+    id: string,
+    patch: Partial<Pick<AgentPersona, 'name' | 'avatar' | 'systemPrompt' | 'vaultPath'>>
+  ): Promise<void>;
+  agentDeletePersona(id: string): Promise<void>;
+  // Read/search the markdown docs inside a brain folder
+  brainFolderDigest(folderPath: string): Promise<{ fileCount: number; sample: string }>;
+  brainFolderSearch(folderPath: string, query: string, limit?: number): Promise<BrainDoc[]>;
 
   // Role-Play (RP) — personas, group scenes, and their chats, stored separately
   rpGetPersonas(): Promise<RPPersona[]>;

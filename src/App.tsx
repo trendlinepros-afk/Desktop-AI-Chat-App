@@ -5,6 +5,7 @@ import { UpdateChecker } from './components/UpdateChecker';
 import { BrainPanel } from './components/Brain/BrainPanel';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { RPApp } from './components/RP/RPApp';
+import { AgentPersonaModal } from './components/Persona/AgentPersonaModal';
 import { OnboardingModal } from './components/Onboarding/OnboardingModal';
 import { Toaster } from './components/Toaster';
 import { useSettingsStore } from './store/settingsStore';
@@ -14,6 +15,7 @@ import { useBrainStore } from './store/brainStore';
 import { useUIStore } from './store/uiStore';
 import { useThemeStore } from './store/themeStore';
 import { useOnboardingStore } from './store/onboardingStore';
+import { useAgentStore } from './store/agentStore';
 import { useAutoMemory } from './hooks/useAutoMemory';
 
 export default function App() {
@@ -21,6 +23,9 @@ export default function App() {
   const loadChats = useChatStore((s) => s.loadChats);
   const loadFolders = useFolderStore((s) => s.load);
   const loadNotes = useBrainStore((s) => s.loadNotes);
+  const loadPersonas = useAgentStore((s) => s.load);
+  const personasOpen = useAgentStore((s) => s.managerOpen);
+  const setPersonasOpen = useAgentStore((s) => s.setManagerOpen);
   const toggleBrainPanel = useBrainStore((s) => s.togglePanel);
   const panelOpen = useBrainStore((s) => s.panelOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
@@ -38,7 +43,8 @@ export default function App() {
     loadChats();
     loadFolders();
     loadNotes();
-  }, [initTheme, initOnboarding, loadSettings, loadChats, loadFolders, loadNotes]);
+    loadPersonas();
+  }, [initTheme, initOnboarding, loadSettings, loadChats, loadFolders, loadNotes, loadPersonas]);
 
   // Global keyboard shortcuts.
   useEffect(() => {
@@ -65,6 +71,7 @@ export default function App() {
       {panelOpen && <BrainPanel />}
       <SettingsModal />
       {rpOpen && <RPApp />}
+      {personasOpen && <AgentPersonaModal onClose={() => setPersonasOpen(false)} />}
       <OnboardingModal />
       <Toaster />
     </div>

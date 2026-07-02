@@ -8,6 +8,7 @@ const { autoUpdater } = electronUpdater;
 import * as db from './db';
 import * as vault from './vault';
 import * as rpMemory from './rpMemory';
+import * as brainFolder from './brainFolder';
 import * as mcp from './mcp';
 import type { McpServerConfig } from './mcp';
 import type { Provider, Settings } from '../src/types';
@@ -135,6 +136,9 @@ function registerIpc(): void {
   ipcMain.handle('chats:updateSystemPrompt', (_e, id: string, prompt: string) =>
     db.updateChatSystemPrompt(id, prompt)
   );
+  ipcMain.handle('chats:updateAgentPersona', (_e, id: string, personaId: string | null) =>
+    db.updateChatAgentPersona(id, personaId)
+  );
   ipcMain.handle('chats:branch', (_e, id: string, upto: number) => db.branchChat(id, upto));
   ipcMain.handle('chats:setNoMemory', (_e, id: string, v: boolean) => db.updateChatNoMemory(id, v));
   ipcMain.handle('chats:setCommitted', (_e, id: string, ts: number) =>
@@ -176,6 +180,16 @@ function registerIpc(): void {
   ipcMain.handle('links:add', (_e, src: string, linked: string) => db.addChatLink(src, linked));
   ipcMain.handle('links:remove', (_e, src: string, linked: string) =>
     db.removeChatLink(src, linked)
+  );
+
+  // ----- Agent personas (vault-backed brains) -----
+  ipcMain.handle('agent:getPersonas', () => db.agentGetPersonas());
+  ipcMain.handle('agent:createPersona', (_e, data) => db.agentCreatePersona(data));
+  ipcMain.handle('agent:updatePersona', (_e, id: string, patch) => db.agentUpdatePersona(id, patch));
+  ipcMain.handle('agent:deletePersona', (_e, id: string) => db.agentDeletePersona(id));
+  ipcMain.handle('brain:folderDigest', (_e, folderPath: string) => brainFolder.digest(folderPath));
+  ipcMain.handle('brain:folderSearch', (_e, folderPath: string, query: string, limit?: number) =>
+    brainFolder.search(folderPath, query, limit)
   );
 
   // ----- Settings -----
