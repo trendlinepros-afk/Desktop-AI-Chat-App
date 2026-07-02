@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useChatStore } from '../../store/chatStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAgentStore } from '../../store/agentStore';
+import { useUIStore } from '../../store/uiStore';
 import { ModelSelector } from '../ModelSelector/ModelSelector';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
@@ -20,6 +21,7 @@ export function ChatWindow() {
   const setNoMemory = useChatStore((s) => s.setNoMemory);
   const setAgentPersona = useChatStore((s) => s.setAgentPersona);
   const personas = useAgentStore((s) => s.personas);
+  const toast = useUIStore((s) => s.toast);
   const vaultPath = useSettingsStore((s) => s.settings.vaultPath);
   const [linkOpen, setLinkOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -79,17 +81,26 @@ export function ChatWindow() {
         )}
         <UsageMeter chat={chat} />
         <button
-          onClick={() => setNoMemory(chat.id, !chat.noMemory)}
+          onClick={() => {
+            const excluded = !chat.noMemory;
+            setNoMemory(chat.id, excluded);
+            toast(
+              excluded
+                ? 'Memory OFF for this chat — it will be skipped by memory saves'
+                : 'Memory ON for this chat — it will be included in memory saves',
+              'info'
+            );
+          }}
           title={
             chat.noMemory
-              ? 'This chat is excluded from scheduled memory saves — click to include it'
-              : 'Exclude this chat from scheduled memory saves'
+              ? 'Memory is OFF for this chat (excluded from saves) — click to turn it back on. To save the conversation now, use "Save to memory".'
+              : 'Memory is ON for this chat. Click to exclude it from memory saves. To save the conversation now, use "Save to memory".'
           }
           className={`rounded-md px-2 py-1 text-sm hover:bg-hover ${
             chat.noMemory ? 'text-red-400' : 'text-text-muted hover:text-text-primary'
           }`}
         >
-          {chat.noMemory ? '🚫 No memory' : '💾 Memory'}
+          {chat.noMemory ? '🚫 Memory: Off' : '💾 Memory: On'}
         </button>
         <VaultContextBadge chatId={chat.id} />
         <button
@@ -120,10 +131,10 @@ export function ChatWindow() {
         </div>
         <button
           onClick={() => setReviewOpen(true)}
-          title="Summarize this chat and save to your Brain"
+          title="Summarize this conversation and save it to your Obsidian vault"
           className="rounded-md border border-brain/30 px-2 py-1 text-sm text-brain hover:bg-brain/10"
         >
-          ✓ End & Review
+          💾 Save to memory
         </button>
       </div>
 
