@@ -70,7 +70,35 @@ export function useSend() {
         context.push(makeMessage(chat.id, 'system', [{ type: 'text', text: chat.systemPrompt }]));
       }
 
-      if (brainEnabled[chat.id] ?? true) {
+      // A bound agent persona ("brain") takes over context: embody the person and
+      // ground answers in that persona's own vault folder, not the global Brain.
+      const persona = chat.agentPersonaId
+        ? (await window.polyglot.agentGetPersonas()).find((p) => p.id === chat.agentPersonaId)
+        : undefined;
+
+      if (persona) {
+        if (persona.systemPrompt.trim()) {
+          context.push(makeMessage(chat.id, 'system', [{ type: 'text', text: persona.systemPrompt }]));
+        }
+        try {
+          const query =
+            [...historyForSearch]
+              .reverse()
+              .find((m) => m.role === 'user')
+              ?.content.find((p) => p.type === 'text')?.text ?? persona.name;
+          const docs = await window.polyglot.brainFolderSearch(persona.vaultPath, query, 6);
+          if (docs.length > 0) {
+            const kb =
+              `Knowledge base for ${persona.name} — the documents that make up this brain. Answer ` +
+              `strictly grounded in them, as ${persona.name} would. If something isn't covered, say ` +
+              `so rather than inventing it.\n\n` +
+              docs.map((d) => `# ${d.title}\n${d.body}`).join('\n\n---\n\n');
+            context.push(makeMessage(chat.id, 'system', [{ type: 'text', text: kb }]));
+          }
+        } catch (err) {
+          console.warn('Brain persona context failed:', err);
+        }
+      } else if (brainEnabled[chat.id] ?? true) {
         try {
           const { systemText, injected } = await buildBrainContext(historyForSearch, settings);
           setActiveContext(chat.id, injected);

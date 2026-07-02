@@ -3,6 +3,7 @@ import { app, safeStorage } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type {
+  AgentPersona,
   Chat,
   Folder,
   Message,
@@ -222,6 +223,22 @@ export function initDb(): void {
   if (!columnExists('folders', 'parent_id')) {
     db.exec('ALTER TABLE folders ADD COLUMN parent_id TEXT');
   }
+  // Agent personas: "brain" characters backed by an Obsidian folder.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_personas (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      avatar TEXT NOT NULL DEFAULT '🧠',
+      system_prompt TEXT NOT NULL DEFAULT '',
+      vault_path TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+  // A chat may be bound to an agent persona (answers as that brain).
+  if (!columnExists('chats', 'agent_persona_id')) {
+    db.exec('ALTER TABLE chats ADD COLUMN agent_persona_id TEXT');
+  }
 
   purgeExpiredChats();
 }
@@ -316,6 +333,7 @@ interface ChatRow {
   system_prompt: string | null;
   no_memory: number | null;
   last_committed_at: number | null;
+  agent_persona_id?: string | null;
 }
 
 function mapChat(r: ChatRow): Chat {
@@ -330,6 +348,7 @@ function mapChat(r: ChatRow): Chat {
     systemPrompt: r.system_prompt ?? '',
     noMemory: !!r.no_memory,
     lastCommittedAt: r.last_committed_at ?? 0,
+    agentPersonaId: r.agent_persona_id ?? null,
   };
 }
 
@@ -418,6 +437,15 @@ export function updateChatModel(id: string, provider: Provider, modelVersion: st
 export function updateChatSystemPrompt(id: string, systemPrompt: string): void {
   db.prepare('UPDATE chats SET system_prompt = ?, updated_at = ? WHERE id = ?').run(
     systemPrompt,
+    Date.now(),
+    id
+  );
+}
+
+// Bind (or clear, with null) the agent persona whose brain a chat answers from.
+export function updateChatAgentPersona(id: string, personaId: string | null): void {
+  db.prepare('UPDATE chats SET agent_persona_id = ?, updated_at = ? WHERE id = ?').run(
+    personaId,
     Date.now(),
     id
   );
@@ -722,6 +750,105 @@ export function getVaultPath(): string {
 // The separate Obsidian vault used only for Role-Play memory.
 export function getRpVaultPath(): string {
   return getSettings().rpVaultPath;
+}
+
+// ---------- Agent personas (vault-backed "brains") ----------
+
+interface AgentPersonaRow {
+  id: string;
+  name: string;
+  avatar: string;
+  system_prompt: string;
+  vault_path: string;
+  created_at: number;
+  updated_at: number;
+}
+
+function mapAgentPersona(r: AgentPersonaRow): AgentPersona {
+  return {
+    id: r.id,
+    name: r.name,
+    avatar: r.avatar,
+    systemPrompt: r.system_prompt,
+    vaultPath: r.vault_path,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function agentGetPersonas(): AgentPersona[] {
+  const rows = db
+    .prepare('SELECT * FROM agent_personas ORDER BY updated_at DESC')
+    .all() as AgentPersonaRow[];
+  return rows.map(mapAgentPersona);
+}
+
+export function agentGetPersona(id: string): AgentPersona | null {
+  const r = db.prepare('SELECT * FROM agent_personas WHERE id = ?').get(id) as
+    | AgentPersonaRow
+    | undefined;
+  return r ? mapAgentPersona(r) : null;
+}
+
+export function agentCreatePersona(data: {
+  name: string;
+  avatar?: string;
+  systemPrompt: string;
+  vaultPath: string;
+}): AgentPersona {
+  const now = Date.now();
+  const row: AgentPersonaRow = {
+    id: randomUUID(),
+    name: data.name,
+    avatar: data.avatar || '🧠',
+    system_prompt: data.systemPrompt,
+    vault_path: data.vaultPath,
+    created_at: now,
+    updated_at: now,
+  };
+  db.prepare(
+    `INSERT INTO agent_personas (id, name, avatar, system_prompt, vault_path, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    row.id,
+    row.name,
+    row.avatar,
+    row.system_prompt,
+    row.vault_path,
+    row.created_at,
+    row.updated_at
+  );
+  return mapAgentPersona(row);
+}
+
+export function agentUpdatePersona(
+  id: string,
+  patch: Partial<Pick<AgentPersona, 'name' | 'avatar' | 'systemPrompt' | 'vaultPath'>>
+): void {
+  const cols: string[] = [];
+  const vals: string[] = [];
+  const map: Record<string, string> = {
+    name: 'name',
+    avatar: 'avatar',
+    systemPrompt: 'system_prompt',
+    vaultPath: 'vault_path',
+  };
+  for (const [key, col] of Object.entries(map)) {
+    const v = (patch as Record<string, unknown>)[key];
+    if (typeof v === 'string') {
+      cols.push(`${col} = ?`);
+      vals.push(v);
+    }
+  }
+  if (cols.length === 0) return;
+  cols.push('updated_at = ?');
+  vals.push(String(Date.now()));
+  db.prepare(`UPDATE agent_personas SET ${cols.join(', ')} WHERE id = ?`).run(...vals, id);
+}
+
+export function agentDeletePersona(id: string): void {
+  db.prepare('DELETE FROM agent_personas WHERE id = ?').run(id);
+  db.prepare('UPDATE chats SET agent_persona_id = NULL WHERE agent_persona_id = ?').run(id);
 }
 
 // Raw key/value access for settings that aren't part of the typed Settings shape

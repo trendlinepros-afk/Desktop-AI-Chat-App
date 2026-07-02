@@ -7,10 +7,12 @@ import { GlobalSearch } from './GlobalSearch';
 import { RecycleBinModal } from './RecycleBinModal';
 import { useBrainStore } from '../../store/brainStore';
 import { useUIStore } from '../../store/uiStore';
+import { useAgentStore } from '../../store/agentStore';
 
 export function Sidebar() {
   const toggleBrain = useBrainStore((s) => s.togglePanel);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+  const openPersonas = useAgentStore((s) => s.setManagerOpen);
   const [binOpen, setBinOpen] = useState(false);
 
   return (
@@ -31,6 +33,12 @@ export function Sidebar() {
 
       <div className="space-y-2 px-3">
         <NewChatButton />
+        <button
+          onClick={() => openPersonas(true)}
+          className="flex w-full items-center gap-2 rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:bg-hover hover:text-text-primary"
+        >
+          🧠 Personas
+        </button>
         <GlobalSearch />
       </div>
 

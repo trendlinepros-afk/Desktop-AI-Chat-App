@@ -11,6 +11,8 @@ const api: WickedAPI = {
     ipcRenderer.invoke('chats:updateModel', id, provider, modelVersion),
   deleteChat: (id) => ipcRenderer.invoke('chats:delete', id),
   updateChatSystemPrompt: (id, prompt) => ipcRenderer.invoke('chats:updateSystemPrompt', id, prompt),
+  updateChatAgentPersona: (id, personaId) =>
+    ipcRenderer.invoke('chats:updateAgentPersona', id, personaId),
   branchChat: (id, upto) => ipcRenderer.invoke('chats:branch', id, upto),
   setChatNoMemory: (id, v) => ipcRenderer.invoke('chats:setNoMemory', id, v),
   setChatCommitted: (id, ts) => ipcRenderer.invoke('chats:setCommitted', id, ts),
@@ -87,6 +89,15 @@ const api: WickedAPI = {
   // Model discovery (OpenAI/DeepSeek listed via main to avoid CORS)
   listOpenAICompatModels: (baseUrl, apiKey) =>
     ipcRenderer.invoke('models:listOpenAICompat', baseUrl, apiKey),
+
+  // Agent personas (vault-backed brains)
+  agentGetPersonas: () => ipcRenderer.invoke('agent:getPersonas'),
+  agentCreatePersona: (data) => ipcRenderer.invoke('agent:createPersona', data),
+  agentUpdatePersona: (id, patch) => ipcRenderer.invoke('agent:updatePersona', id, patch),
+  agentDeletePersona: (id) => ipcRenderer.invoke('agent:deletePersona', id),
+  brainFolderDigest: (folderPath) => ipcRenderer.invoke('brain:folderDigest', folderPath),
+  brainFolderSearch: (folderPath, query, limit) =>
+    ipcRenderer.invoke('brain:folderSearch', folderPath, query, limit),
 
   // Role-Play (RP)
   rpGetPersonas: () => ipcRenderer.invoke('rp:getPersonas'),
