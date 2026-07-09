@@ -25,6 +25,7 @@ const EMPTY: Settings = {
   rpSummarizeEvery: 20,
   rpVaultPath: '',
   rpAutoReplyLimit: 3,
+  projectBoardPath: '',
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

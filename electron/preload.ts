@@ -138,6 +138,20 @@ const api: WickedAPI = {
   rpGrokComplete: (apiKey, model, messages, options) =>
     ipcRenderer.invoke('rp:grokComplete', apiKey, model, messages, options),
 
+  // Project Board
+  pbGetDataFolder: () => ipcRenderer.invoke('pb:getDataFolder'),
+  pbChooseDataFolder: () => ipcRenderer.invoke('pb:chooseDataFolder'),
+  pbSetDataFolder: (folder, migrate) => ipcRenderer.invoke('pb:setDataFolder', folder, migrate),
+  pbGetProjects: () => ipcRenderer.invoke('pb:getProjects'),
+  pbCreateProject: (name, icon) => ipcRenderer.invoke('pb:createProject', name, icon),
+  pbRenameProject: (id, name) => ipcRenderer.invoke('pb:renameProject', id, name),
+  pbDeleteProject: (id) => ipcRenderer.invoke('pb:deleteProject', id),
+  pbLoadBoard: (projectId) => ipcRenderer.invoke('pb:loadBoard', projectId),
+  pbSaveBoard: (projectId, data) => ipcRenderer.invoke('pb:saveBoard', projectId, data),
+  pbSaveAsset: (projectId, dataUrl) => ipcRenderer.invoke('pb:saveAsset', projectId, dataUrl),
+  pbGetAsset: (projectId, assetId) => ipcRenderer.invoke('pb:getAsset', projectId, assetId),
+  pbImportImage: (projectId) => ipcRenderer.invoke('pb:importImage', projectId),
+
   // Shell
   openExternal: (p) => ipcRenderer.invoke('shell:openExternal', p),
 };

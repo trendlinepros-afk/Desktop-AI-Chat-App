@@ -59,6 +59,7 @@ const DEFAULT_SETTINGS: Settings = {
   rpSummarizeEvery: 20,
   rpVaultPath: '',
   rpAutoReplyLimit: 3,
+  projectBoardPath: '',
 };
 
 export function initDb(): void {
@@ -726,6 +727,7 @@ export function getSettings(): Settings {
     rpAutoReplyLimit: map.has('rpAutoReplyLimit')
       ? Number(map.get('rpAutoReplyLimit'))
       : DEFAULT_SETTINGS.rpAutoReplyLimit,
+    projectBoardPath: map.get('projectBoardPath') ?? DEFAULT_SETTINGS.projectBoardPath,
   };
 }
 
