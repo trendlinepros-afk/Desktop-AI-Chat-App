@@ -148,6 +148,52 @@ export interface RPMessage {
   createdAt: number;
 }
 
+// ---------- Project Board ----------
+// A freeform OneNote-style canvas per project: text notes and images placed
+// anywhere, freehand ink on top, notes taggable with a category and priority.
+// All data lives as plain files in a user-mappable folder (e.g. a network
+// drive) so it can be backed up outside the app.
+
+export interface Project {
+  id: string;
+  name: string;
+  icon: string; // emoji shown in the project list
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type BoardPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
+
+export interface BoardItem {
+  id: string;
+  type: 'text' | 'image';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  z: number; // stacking order
+  text?: string; // text items
+  color?: string; // text items — note tint key (see NOTE_COLORS)
+  assetId?: string; // image items — file in the project's assets folder
+  category: string; // free-text label ('' = none)
+  priority: BoardPriority;
+}
+
+// A freehand pen stroke drawn on the board.
+export interface BoardStroke {
+  id: string;
+  color: string;
+  size: number;
+  points: [number, number][];
+}
+
+export interface BoardData {
+  items: BoardItem[];
+  strokes: BoardStroke[];
+  categories: string[]; // every category ever used, for quick re-pick
+  updatedAt: number;
+}
+
 export interface McpServerConfig {
   id: string;
   name: string;
@@ -191,6 +237,9 @@ export interface Settings {
   rpSummarizeEvery: number; // summarize after this many new messages
   rpVaultPath: string; // a SEPARATE Obsidian vault folder used only for RP memory
   rpAutoReplyLimit: number; // max AI replies in a row before pausing for you (caps API use)
+  // Where Project Board data lives ('' = the app's user-data folder). Point it
+  // at a network drive to keep boards backed up.
+  projectBoardPath: string;
 }
 
 export const VAULT_CATEGORIES = [
@@ -386,6 +435,20 @@ export interface WickedAPI {
     messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
     options?: { temperature?: number; presencePenalty?: number; frequencyPenalty?: number }
   ): Promise<string>;
+
+  // Project Board — file-backed freeform boards, one per project
+  pbGetDataFolder(): Promise<string>;
+  pbChooseDataFolder(): Promise<string | null>;
+  pbSetDataFolder(path: string, migrate: boolean): Promise<void>;
+  pbGetProjects(): Promise<Project[]>;
+  pbCreateProject(name: string, icon?: string): Promise<Project>;
+  pbRenameProject(id: string, name: string): Promise<void>;
+  pbDeleteProject(id: string): Promise<void>;
+  pbLoadBoard(projectId: string): Promise<BoardData>;
+  pbSaveBoard(projectId: string, data: BoardData): Promise<void>;
+  pbSaveAsset(projectId: string, dataUrl: string): Promise<{ assetId: string }>;
+  pbGetAsset(projectId: string, assetId: string): Promise<string | null>;
+  pbImportImage(projectId: string): Promise<{ assetId: string; dataUrl: string } | null>;
 
   // Shell
   openExternal(path: string): Promise<void>;

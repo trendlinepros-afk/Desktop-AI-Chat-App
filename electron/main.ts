@@ -9,6 +9,7 @@ import * as db from './db';
 import * as vault from './vault';
 import * as rpMemory from './rpMemory';
 import * as brainFolder from './brainFolder';
+import * as projectBoard from './projectBoard';
 import * as mcp from './mcp';
 import type { McpServerConfig } from './mcp';
 import type { Provider, Settings } from '../src/types';
@@ -191,6 +192,47 @@ function registerIpc(): void {
   ipcMain.handle('brain:folderSearch', (_e, folderPath: string, query: string, limit?: number) =>
     brainFolder.search(folderPath, query, limit)
   );
+
+  // ----- Project Board -----
+  ipcMain.handle('pb:getDataFolder', () => projectBoard.getDataFolder());
+  ipcMain.handle('pb:chooseDataFolder', async () => {
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Choose where Project Board data is stored',
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+  ipcMain.handle('pb:setDataFolder', (_e, folder: string, migrate: boolean) => {
+    if (migrate) projectBoard.migrateData(folder);
+    db.saveSettings({ projectBoardPath: folder });
+  });
+  ipcMain.handle('pb:getProjects', () => projectBoard.listProjects());
+  ipcMain.handle('pb:createProject', (_e, name: string, icon?: string) =>
+    projectBoard.createProject(name, icon)
+  );
+  ipcMain.handle('pb:renameProject', (_e, id: string, name: string) =>
+    projectBoard.renameProject(id, name)
+  );
+  ipcMain.handle('pb:deleteProject', (_e, id: string) => projectBoard.deleteProject(id));
+  ipcMain.handle('pb:loadBoard', (_e, projectId: string) => projectBoard.loadBoard(projectId));
+  ipcMain.handle('pb:saveBoard', (_e, projectId: string, data) =>
+    projectBoard.saveBoard(projectId, data)
+  );
+  ipcMain.handle('pb:saveAsset', (_e, projectId: string, dataUrl: string) =>
+    projectBoard.saveAsset(projectId, dataUrl)
+  );
+  ipcMain.handle('pb:getAsset', (_e, projectId: string, assetId: string) =>
+    projectBoard.getAsset(projectId, assetId)
+  );
+  ipcMain.handle('pb:importImage', async (_e, projectId: string) => {
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return projectBoard.saveAssetFromFile(projectId, result.filePaths[0]);
+  });
 
   // ----- Settings -----
   ipcMain.handle('settings:get', () => db.getSettings());

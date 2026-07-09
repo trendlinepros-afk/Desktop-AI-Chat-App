@@ -8,9 +8,11 @@ import { RecycleBinModal } from './RecycleBinModal';
 import { useBrainStore } from '../../store/brainStore';
 import { useUIStore } from '../../store/uiStore';
 import { useAgentStore } from '../../store/agentStore';
+import { useProjectBoardStore } from '../../store/projectBoardStore';
 
 export function Sidebar() {
   const toggleBrain = useBrainStore((s) => s.togglePanel);
+  const openProjectBoard = useProjectBoardStore((s) => s.setOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const openPersonas = useAgentStore((s) => s.setManagerOpen);
   const [binOpen, setBinOpen] = useState(false);
@@ -65,6 +67,13 @@ export function Sidebar() {
             🗑
           </button>
         </div>
+        <button
+          onClick={() => openProjectBoard(true)}
+          className="mt-1 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-accent hover:bg-accent/10"
+        >
+          <span className="flex items-center gap-2">📋 Project Board</span>
+          <span>→</span>
+        </button>
       </div>
 
       {binOpen && <RecycleBinModal onClose={() => setBinOpen(false)} />}

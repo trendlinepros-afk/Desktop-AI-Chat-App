@@ -5,6 +5,8 @@ import { UpdateChecker } from './components/UpdateChecker';
 import { BrainPanel } from './components/Brain/BrainPanel';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { RPApp } from './components/RP/RPApp';
+import { ProjectBoardApp } from './components/ProjectBoard/ProjectBoardApp';
+import { useProjectBoardStore } from './store/projectBoardStore';
 import { AgentPersonaModal } from './components/Persona/AgentPersonaModal';
 import { OnboardingModal } from './components/Onboarding/OnboardingModal';
 import { Toaster } from './components/Toaster';
@@ -30,6 +32,7 @@ export default function App() {
   const panelOpen = useBrainStore((s) => s.panelOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const rpOpen = useUIStore((s) => s.rpOpen);
+  const projectBoardOpen = useProjectBoardStore((s) => s.open);
   const initTheme = useThemeStore((s) => s.init);
   const initOnboarding = useOnboardingStore((s) => s.init);
 
@@ -71,6 +74,7 @@ export default function App() {
       {panelOpen && <BrainPanel />}
       <SettingsModal />
       {rpOpen && <RPApp />}
+      {projectBoardOpen && <ProjectBoardApp />}
       {personasOpen && <AgentPersonaModal onClose={() => setPersonasOpen(false)} />}
       <OnboardingModal />
       <Toaster />
