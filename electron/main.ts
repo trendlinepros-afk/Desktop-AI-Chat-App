@@ -10,6 +10,7 @@ import * as vault from './vault';
 import * as rpMemory from './rpMemory';
 import * as brainFolder from './brainFolder';
 import * as projectBoard from './projectBoard';
+import * as webPortal from './webPortal';
 import * as mcp from './mcp';
 import type { McpServerConfig } from './mcp';
 import type { Provider, Settings } from '../src/types';
@@ -70,8 +71,12 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   db.initDb();
+  // Must run before registerIpc so the portal sees every handler.
+  webPortal.captureIpcHandlers();
   registerIpc();
   createWindow();
+  webPortal.init(RENDERER_DIST);
+  webPortal.sync();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -163,8 +168,8 @@ function registerIpc(): void {
 
   // ----- Folders -----
   ipcMain.handle('folders:getAll', () => db.getFolders());
-  ipcMain.handle('folders:create', (_e, name: string, parentId: string | null) =>
-    db.createFolder(name, parentId)
+  ipcMain.handle('folders:create', (_e, name: string, parentId?: string | null) =>
+    db.createFolder(name, parentId ?? null)
   );
   ipcMain.handle('folders:rename', (_e, id: string, name: string) => db.renameFolder(id, name));
   ipcMain.handle('folders:move', (_e, id: string, parentId: string | null) =>
@@ -236,7 +241,14 @@ function registerIpc(): void {
 
   // ----- Settings -----
   ipcMain.handle('settings:get', () => db.getSettings());
-  ipcMain.handle('settings:save', (_e, partial: Partial<Settings>) => db.saveSettings(partial));
+  ipcMain.handle('settings:save', (_e, partial: Partial<Settings>) => {
+    db.saveSettings(partial);
+    // Apply web-portal changes (enable/disable/port) immediately.
+    if ('webPortalEnabled' in partial || 'webPortalPort' in partial) webPortal.sync();
+  });
+
+  // ----- Web portal -----
+  ipcMain.handle('portal:getStatus', () => webPortal.getStatus());
 
   // ----- File dialogs -----
   ipcMain.handle('dialog:openFile', async () => {

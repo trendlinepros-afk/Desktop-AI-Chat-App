@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Provider, Settings } from '../../types';
+import type { PortalStatus, Provider, Settings } from '../../types';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
 import { useOnboardingStore } from '../../store/onboardingStore';
@@ -232,6 +232,36 @@ export function SettingsModal() {
             </p>
           </Section>
 
+          {/* Web portal (LAN browser access) */}
+          <Section title="Web portal (browser access)">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={draft.webPortalEnabled}
+                onChange={(e) => update({ webPortalEnabled: e.target.checked })}
+              />
+              Serve WICKED to browsers on your local network while the app is running
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-text-muted">Port</span>
+              <input
+                type="number"
+                min={1}
+                max={65535}
+                value={draft.webPortalPort}
+                onChange={(e) => update({ webPortalPort: Number(e.target.value) || 0 })}
+                className="w-28 rounded-lg border border-edge bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
+              />
+              <span className="text-xs text-text-muted">Changes apply when you save.</span>
+            </div>
+            <PortalStatusView />
+            <p className="mt-1 text-xs text-text-muted">
+              Anyone with the link (it includes an access token) can use WICKED — and your API
+              keys — so only open it on devices you trust. If another device can't connect, allow
+              WICKED through Windows Defender Firewall when prompted.
+            </p>
+          </Section>
+
           {/* MCP servers */}
           <Section title="MCP Servers (tool use)">
             <McpServerSettings />
@@ -284,6 +314,68 @@ export function SettingsModal() {
 
       {managerOpen && (
         <OllamaModelManager baseUrl={draft.ollamaBaseUrl} onClose={() => setManagerOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+// Live state of the LAN web portal: whether it's serving and the link(s) to
+// open on another device. Reflects saved settings, not the unsaved draft.
+function PortalStatusView() {
+  const toast = useUIStore((s) => s.toast);
+  const [status, setStatus] = useState<PortalStatus | null>(null);
+
+  const refresh = () => window.polyglot.portalGetStatus().then(setStatus);
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  if (!status) return null;
+
+  const copy = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast('Portal link copied', 'success');
+    } catch {
+      toast('Copy failed — select the link text instead', 'error');
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface px-3 py-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+          {status.running
+            ? `Running on port ${status.port}`
+            : status.enabled
+              ? `Not running${status.error ? ` — ${status.error}` : ''}`
+            : 'Off'}
+        </span>
+        <button
+          onClick={refresh}
+          className="text-xs text-text-muted hover:text-text-primary"
+          title="Refresh status"
+        >
+          ⟳ Refresh
+        </button>
+      </div>
+      {status.running &&
+        status.urls.map((url) => (
+          <div key={url} className="mt-1.5 flex items-center gap-2">
+            <code className="flex-1 truncate text-xs">{url}</code>
+            <button
+              onClick={() => copy(url)}
+              className="rounded border border-edge px-2 py-0.5 text-xs text-text-muted hover:text-text-primary"
+            >
+              Copy
+            </button>
+          </div>
+        ))}
+      {status.running && (
+        <p className="mt-1.5 text-xs text-text-muted">
+          Open a link on any device on the same network. The token is remembered per browser
+          after the first visit.
+        </p>
       )}
     </div>
   );
