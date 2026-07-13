@@ -16,7 +16,13 @@ import type {
 } from '../src/types';
 
 // API keys are stored encrypted at rest via the OS keychain (safeStorage).
-const SECRET_KEYS = new Set(['openaiApiKey', 'geminiApiKey', 'deepseekApiKey', 'grokApiKey']);
+const SECRET_KEYS = new Set([
+  'openaiApiKey',
+  'geminiApiKey',
+  'deepseekApiKey',
+  'grokApiKey',
+  'webPortalToken',
+]);
 const ENC_PREFIX = 'enc:v1:';
 
 function encryptSecret(value: string): string {
@@ -60,6 +66,9 @@ const DEFAULT_SETTINGS: Settings = {
   rpVaultPath: '',
   rpAutoReplyLimit: 3,
   projectBoardPath: '',
+  webPortalEnabled: true,
+  webPortalPort: 8967,
+  webPortalToken: '',
 };
 
 export function initDb(): void {
@@ -728,6 +737,13 @@ export function getSettings(): Settings {
       ? Number(map.get('rpAutoReplyLimit'))
       : DEFAULT_SETTINGS.rpAutoReplyLimit,
     projectBoardPath: map.get('projectBoardPath') ?? DEFAULT_SETTINGS.projectBoardPath,
+    webPortalEnabled: map.has('webPortalEnabled')
+      ? map.get('webPortalEnabled') === 'true'
+      : DEFAULT_SETTINGS.webPortalEnabled,
+    webPortalPort: map.has('webPortalPort')
+      ? Number(map.get('webPortalPort'))
+      : DEFAULT_SETTINGS.webPortalPort,
+    webPortalToken: decryptSecret(map.get('webPortalToken') ?? DEFAULT_SETTINGS.webPortalToken),
   };
 }
 

@@ -26,6 +26,9 @@ const EMPTY: Settings = {
   rpVaultPath: '',
   rpAutoReplyLimit: 3,
   projectBoardPath: '',
+  webPortalEnabled: true,
+  webPortalPort: 8967,
+  webPortalToken: '',
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

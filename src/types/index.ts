@@ -240,6 +240,20 @@ export interface Settings {
   // Where Project Board data lives ('' = the app's user-data folder). Point it
   // at a network drive to keep boards backed up.
   projectBoardPath: string;
+  // LAN web portal: serve the app to browsers on the local network while the
+  // desktop app runs. The token gates all data access.
+  webPortalEnabled: boolean;
+  webPortalPort: number;
+  webPortalToken: string;
+}
+
+// Live state of the LAN web portal (Settings → Web portal).
+export interface PortalStatus {
+  enabled: boolean;
+  running: boolean;
+  port: number;
+  urls: string[]; // ready-to-open http://<lan-ip>:<port>/?token=… links
+  error?: string;
 }
 
 export const VAULT_CATEGORIES = [
@@ -449,6 +463,9 @@ export interface WickedAPI {
   pbSaveAsset(projectId: string, dataUrl: string): Promise<{ assetId: string }>;
   pbGetAsset(projectId: string, assetId: string): Promise<string | null>;
   pbImportImage(projectId: string): Promise<{ assetId: string; dataUrl: string } | null>;
+
+  // Web portal
+  portalGetStatus(): Promise<PortalStatus>;
 
   // Shell
   openExternal(path: string): Promise<void>;
