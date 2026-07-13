@@ -33,7 +33,8 @@ export function ChatWindow() {
   if (!chat) {
     return (
       <div className="flex flex-1 flex-col">
-        <div className="flex items-center justify-end border-b border-edge bg-topbar px-4 py-2">
+        <div className="flex items-center justify-between border-b border-edge bg-topbar px-4 py-2">
+          <MobileMenuButton />
           <ThemeToggle />
         </div>
         <div className="flex flex-1 flex-col items-center justify-center text-center">
@@ -58,8 +59,9 @@ export function ChatWindow() {
       <ModelSelector chat={chat} />
 
       {/* Chat sub-header: title, link, end & review */}
-      <div className="flex items-center gap-2 border-b border-edge bg-chat px-4 py-2">
-        <h2 className="flex-1 truncate text-sm font-medium">{chat.title}</h2>
+      <div className="flex flex-wrap items-center gap-2 border-b border-edge bg-chat px-4 py-2">
+        <MobileMenuButton />
+        <h2 className="min-w-[8rem] flex-1 truncate text-sm font-medium">{chat.title}</h2>
         {personas.length > 0 && (
           <select
             value={chat.agentPersonaId ?? ''}
@@ -146,5 +148,20 @@ export function ChatWindow() {
       {personaOpen && <SystemPromptModal chat={chat} onClose={() => setPersonaOpen(false)} />}
       {buildOpen && <BuildPromptModal chat={chat} onClose={() => setBuildOpen(false)} />}
     </div>
+  );
+}
+
+// Opens the sidebar drawer — only exists on small screens (e.g. the web
+// portal on a phone), where the sidebar is hidden by default.
+function MobileMenuButton() {
+  const setMobileNavOpen = useUIStore((s) => s.setMobileNavOpen);
+  return (
+    <button
+      onClick={() => setMobileNavOpen(true)}
+      title="Menu"
+      className="rounded-md px-2 py-1 text-lg leading-none text-text-muted hover:text-text-primary md:hidden"
+    >
+      ☰
+    </button>
   );
 }

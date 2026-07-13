@@ -16,6 +16,12 @@ export function ProjectBoardApp() {
   const board = useProjectBoardStore((s) => s.board);
   const dataFolder = useProjectBoardStore((s) => s.dataFolder);
   const [folderModalOpen, setFolderModalOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+
+  // On phones the project list is a drawer — close it once a project is picked.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [activeProjectId]);
 
   useEffect(() => {
     void load();
@@ -43,6 +49,13 @@ export function ProjectBoardApp() {
       {/* Top bar */}
       <div className="flex items-center gap-2 border-b border-edge bg-topbar px-4 py-2">
         <button
+          onClick={() => setNavOpen(true)}
+          title="Projects"
+          className="rounded-md px-2 py-1 text-lg leading-none text-text-muted hover:text-text-primary md:hidden"
+        >
+          ☰
+        </button>
+        <button
           onClick={() => setOpen(false)}
           className="rounded-lg border border-edge px-3 py-1.5 text-sm text-text-muted hover:text-text-primary"
         >
@@ -66,7 +79,7 @@ export function ProjectBoardApp() {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <ProjectSidebar />
+        <ProjectSidebar mobileOpen={navOpen} onMobileClose={() => setNavOpen(false)} />
         {!activeProject ? (
           <div className="flex flex-1 items-center justify-center p-8 text-center">
             <div>

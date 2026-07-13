@@ -65,7 +65,7 @@ export default function App() {
   }, [toggleBrainPanel, setSettingsOpen]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-app text-text-primary">
+    <div className="flex h-screen w-screen overflow-hidden bg-app text-text-primary supports-[height:100dvh]:h-[100dvh]">
       <Sidebar />
       <main className="flex min-w-0 flex-1 flex-col">
         <ChatWindow />

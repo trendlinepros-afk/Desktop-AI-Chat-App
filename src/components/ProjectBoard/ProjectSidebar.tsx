@@ -2,7 +2,14 @@ import { useState } from 'react';
 import { useProjectBoardStore } from '../../store/projectBoardStore';
 
 // The left menu of the Project Board: one entry per project, added manually.
-export function ProjectSidebar() {
+// On small screens it renders as an off-canvas drawer.
+export function ProjectSidebar({
+  mobileOpen,
+  onMobileClose,
+}: {
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}) {
   const projects = useProjectBoardStore((s) => s.projects);
   const activeProjectId = useProjectBoardStore((s) => s.activeProjectId);
   const selectProject = useProjectBoardStore((s) => s.selectProject);
@@ -36,7 +43,15 @@ export function ProjectSidebar() {
   };
 
   return (
-    <aside className="flex w-64 flex-shrink-0 flex-col border-r border-edge bg-sidebar">
+    <>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={onMobileClose} />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-edge bg-sidebar transition-transform duration-200 md:static md:flex-shrink-0 md:translate-x-0 ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
       <div className="p-3">
         <button
           onClick={() => setAdding(true)}
@@ -125,6 +140,7 @@ export function ProjectSidebar() {
           )
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

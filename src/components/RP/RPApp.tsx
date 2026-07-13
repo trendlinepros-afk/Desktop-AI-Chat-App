@@ -23,6 +23,13 @@ export function RPApp() {
     id: null,
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const activeSceneId = useRPStore((s) => s.activeSceneId);
+
+  // On phones the sidebar is a drawer — close it once a conversation is picked.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [activeSceneId]);
 
   useEffect(() => {
     (async () => {
@@ -50,6 +57,13 @@ export function RPApp() {
       {/* Top bar */}
       <div className="flex items-center gap-2 border-b border-edge bg-topbar px-4 py-2">
         <button
+          onClick={() => setNavOpen(true)}
+          title="Menu"
+          className="rounded-md px-2 py-1 text-lg leading-none text-text-muted hover:text-text-primary md:hidden"
+        >
+          ☰
+        </button>
+        <button
           onClick={() => setRpOpen(false)}
           className="rounded-lg border border-edge px-3 py-1.5 text-sm text-text-muted hover:text-text-primary"
         >
@@ -74,6 +88,8 @@ export function RPApp() {
           onNewScene={() => setSceneEditor({ open: true, id: null })}
           onNewPersona={() => setPersonaEditor({ open: true, id: null })}
           onEditPersona={(id) => setPersonaEditor({ open: true, id })}
+          mobileOpen={navOpen}
+          onMobileClose={() => setNavOpen(false)}
         />
         <RPChatWindow
           onEditScene={(id) => setSceneEditor({ open: true, id })}

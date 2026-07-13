@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { UncategorizedList } from './UncategorizedList';
 import { FolderList } from './FolderList';
 import { NewChatButton } from './NewChatButton';
@@ -9,16 +9,36 @@ import { useBrainStore } from '../../store/brainStore';
 import { useUIStore } from '../../store/uiStore';
 import { useAgentStore } from '../../store/agentStore';
 import { useProjectBoardStore } from '../../store/projectBoardStore';
+import { useChatStore } from '../../store/chatStore';
 
 export function Sidebar() {
   const toggleBrain = useBrainStore((s) => s.togglePanel);
   const openProjectBoard = useProjectBoardStore((s) => s.setOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const openPersonas = useAgentStore((s) => s.setManagerOpen);
+  const mobileNavOpen = useUIStore((s) => s.mobileNavOpen);
+  const setMobileNavOpen = useUIStore((s) => s.setMobileNavOpen);
+  const activeChatId = useChatStore((s) => s.activeChatId);
   const [binOpen, setBinOpen] = useState(false);
 
+  // On phones the sidebar is a drawer — close it once a chat is picked.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [activeChatId, setMobileNavOpen]);
+
   return (
-    <aside className="flex h-full w-72 flex-shrink-0 flex-col border-r border-edge bg-sidebar">
+    <>
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/60 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-edge bg-sidebar transition-transform duration-200 md:static md:h-full md:flex-shrink-0 md:translate-x-0 ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
       <div className="flex items-center justify-between px-4 py-3.5">
         <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <span>🔮</span>
@@ -76,7 +96,8 @@ export function Sidebar() {
         </button>
       </div>
 
-      {binOpen && <RecycleBinModal onClose={() => setBinOpen(false)} />}
-    </aside>
+        {binOpen && <RecycleBinModal onClose={() => setBinOpen(false)} />}
+      </aside>
+    </>
   );
 }

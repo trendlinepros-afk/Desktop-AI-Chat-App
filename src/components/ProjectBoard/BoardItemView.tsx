@@ -127,6 +127,9 @@ export function BoardItemView({
         height: item.h,
         zIndex: item.z,
         backgroundColor: tint || undefined,
+        // Let touch drags move the item instead of scrolling the canvas
+        // (scroll by dragging the empty background instead).
+        touchAction: editing ? 'auto' : 'none',
       }}
       onPointerDown={(e) => beginDrag(e, 'move')}
       onPointerMove={onPointerMove}

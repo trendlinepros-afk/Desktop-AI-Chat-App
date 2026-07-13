@@ -5,10 +5,14 @@ export function RPSidebar({
   onNewScene,
   onNewPersona,
   onEditPersona,
+  mobileOpen,
+  onMobileClose,
 }: {
   onNewScene: () => void;
   onNewPersona: () => void;
   onEditPersona: (id: string) => void;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
 }) {
   const scenes = useRPStore((s) => s.scenes);
   const personas = useRPStore((s) => s.personas);
@@ -16,7 +20,15 @@ export function RPSidebar({
   const selectScene = useRPStore((s) => s.selectScene);
 
   return (
-    <aside className="flex w-64 flex-col border-r border-edge bg-sidebar">
+    <>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={onMobileClose} />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-edge bg-sidebar transition-transform duration-200 md:static md:translate-x-0 ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
       {/* Conversations */}
       <div className="flex items-center justify-between px-3 pt-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">
@@ -83,6 +95,7 @@ export function RPSidebar({
           </button>
         ))}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

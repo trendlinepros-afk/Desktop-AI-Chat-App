@@ -369,6 +369,8 @@ export function BoardCanvas({ projectId, board }: { projectId: string; board: Bo
               zIndex: 9000,
               pointerEvents: inkMode ? 'auto' : 'none',
               cursor: tool === 'erase' ? 'cell' : 'crosshair',
+              // Without this, touch devices pan/scroll instead of drawing.
+              touchAction: inkMode ? 'none' : 'auto',
             }}
             onPointerDown={svgPointerDown}
             onPointerMove={svgPointerMove}

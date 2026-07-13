@@ -115,7 +115,7 @@ export function ModelSelector({ chat }: { chat: Chat }) {
   const versions = imageGen && imageVersions.length > 0 ? imageVersions : baseVersions;
 
   return (
-    <div className="flex items-center gap-2 border-b border-edge bg-topbar px-4 py-2 text-sm">
+    <div className="flex flex-wrap items-center gap-2 border-b border-edge bg-topbar px-4 py-2 text-sm">
       {/* Provider pill */}
       <div className="relative">
         <select

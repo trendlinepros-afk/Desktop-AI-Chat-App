@@ -41,7 +41,7 @@ export function BrainPanel() {
   const openExternal = (path: string) => window.polyglot.openExternal(path);
 
   return (
-    <aside className="flex h-full w-[360px] flex-shrink-0 flex-col border-l border-edge bg-sidebar">
+    <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[360px] flex-col border-l border-edge bg-sidebar md:static md:h-full md:w-[360px] md:flex-shrink-0">
       <div className="flex items-center justify-between px-4 py-3">
         <h2 className="flex items-center gap-2 font-semibold text-brain">🧠 Master Brain</h2>
         <div className="flex items-center gap-1">
