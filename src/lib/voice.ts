@@ -13,6 +13,20 @@ import { withRetry } from './retry';
 // button calls unlockAudio() synchronously in its click handler.
 
 // A tiny silent WAV used to "activate" the shared element inside a gesture.
+export const TTS_VOICES = [
+  'alloy',
+  'ash',
+  'ballad',
+  'coral',
+  'echo',
+  'fable',
+  'nova',
+  'onyx',
+  'sage',
+  'shimmer',
+  'verse',
+];
+
 const SILENT_WAV =
   'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 
@@ -143,7 +157,7 @@ export function isToolStatus(s: string): boolean {
 const COALESCE_CHARS = 180;
 
 class TtsQueue {
-  private pending: string[] = [];
+  private pending: { text: string; voice: string }[] = [];
   private fetched: { url: string } | null = null;
   private fetching = false;
   private playing = false;
@@ -166,11 +180,12 @@ class TtsQueue {
     return this.playing || this.fetching || this.pending.length > 0 || !!this.fetched;
   }
 
-  enqueue(text: string, settings: Settings): void {
+  // voice '' = the global settings voice; per-persona voices pass their own.
+  enqueue(text: string, settings: Settings, voice = ''): void {
     const t = text.trim();
     if (!t) return;
     this.settings = settings;
-    this.pending.push(t);
+    this.pending.push({ text: t, voice });
     void this.pump();
   }
 
@@ -206,13 +221,19 @@ class TtsQueue {
     }
   }
 
-  // Pull the next ~COALESCE_CHARS worth of pending sentences as one request.
-  private takeChunk(): string {
-    let chunk = this.pending.shift() ?? '';
-    while (this.pending.length > 0 && chunk.length + this.pending[0].length + 1 < COALESCE_CHARS) {
-      chunk += ' ' + this.pending.shift();
+  // Pull the next ~COALESCE_CHARS worth of pending sentences as one request —
+  // but never merge across a voice change (each speaker keeps their voice).
+  private takeChunk(): { text: string; voice: string } {
+    const first = this.pending.shift() ?? { text: '', voice: '' };
+    let chunk = first.text;
+    while (
+      this.pending.length > 0 &&
+      this.pending[0].voice === first.voice &&
+      chunk.length + this.pending[0].text.length + 1 < COALESCE_CHARS
+    ) {
+      chunk += ' ' + this.pending.shift()!.text;
     }
-    return chunk;
+    return { text: chunk, voice: first.voice };
   }
 
   private async pump(): Promise<void> {
@@ -229,8 +250,8 @@ class TtsQueue {
       const res = await client(this.settings).audio.speech.create(
         {
           model: this.settings.ttsModel,
-          voice: this.settings.ttsVoice as 'alloy',
-          input: chunk,
+          voice: (chunk.voice || this.settings.ttsVoice) as 'alloy',
+          input: chunk.text,
           response_format: 'mp3',
         },
         { signal: abort.signal }
@@ -286,21 +307,21 @@ export function getTtsQueue(): TtsQueue {
 
 // Read a whole message aloud (used by SpeakButton): stops whatever else is
 // playing, then queues this text in sentence chunks.
-export function speakText(text: string, settings: Settings, owner?: unknown): void {
+export function speakText(text: string, settings: Settings, owner?: unknown, voice = ''): void {
   const q = getTtsQueue();
   q.stop();
   q.owner = owner ?? null;
-  speakAppendText(text, settings);
+  speakAppendText(text, settings, voice);
 }
 
 // Queue more speech WITHOUT interrupting what's already playing — used to
-// read incoming RP messages in arrival order.
-export function speakAppendText(text: string, settings: Settings): void {
+// read incoming RP messages in arrival order (each in its speaker's voice).
+export function speakAppendText(text: string, settings: Settings, voice = ''): void {
   const q = getTtsQueue();
   const clean = stripForSpeech(text);
   if (!clean) return;
   const { sentences, end } = splitCompleteSentences(clean + ' ', 0);
-  for (const s of sentences) q.enqueue(s, settings);
+  for (const s of sentences) q.enqueue(s, settings, voice);
   const tail = (clean + ' ').slice(end).trim();
-  if (tail) q.enqueue(tail, settings);
+  if (tail) q.enqueue(tail, settings, voice);
 }

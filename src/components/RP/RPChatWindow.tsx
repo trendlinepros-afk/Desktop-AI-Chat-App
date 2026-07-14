@@ -8,6 +8,9 @@ import { SpeakButton } from '../Chat/SpeakButton';
 import { AddPersonModal } from './AddPersonModal';
 import { GuideModal } from './GuideModal';
 import { RPImageModal } from './RPImageModal';
+import { RPCallOverlay } from './RPCallOverlay';
+import { ImageLightbox } from './ImageLightbox';
+import { generateAndSend } from '../../lib/rpImageSend';
 import { Avatar } from './Avatar';
 import type { RPMessage, RPPersona } from '../../types';
 
@@ -54,6 +57,9 @@ export function RPChatWindow({
   const [titleDraft, setTitleDraft] = useState('');
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [snapBusy, setSnapBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recorder = useVoiceRecorder();
@@ -83,7 +89,7 @@ export function RPChatWindow({
       if (seenRef.current.has(m.id)) continue;
       seenRef.current.add(m.id);
       if (autoSpeak && m.kind === 'chat' && !isMineMsg(m) && m.content) {
-        speakAppendText(m.content, settings);
+        speakAppendText(m.content, settings, byId(m.senderPersonaId)?.voice ?? '');
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,6 +184,53 @@ export function RPChatWindow({
       await recorder.start({ silenceMs: 1400, maxMs: 30_000, onAutoStop: () => void finishDictation() });
     } catch (err) {
       toast((err as Error).message, 'error');
+    }
+  };
+
+  // 📷 One-click scene photo: Grok turns the last 10 messages into an image
+  // prompt, then the persona "snaps" it through the local ComfyUI pipeline.
+  const snapScenePhoto = async () => {
+    if (snapBusy || !scene) return;
+    if (!grokKey) {
+      toast('Add your Grok API key in RP Settings first', 'error');
+      return;
+    }
+    if (aiMembers.length === 0) {
+      toast('Add a character to the conversation first', 'error');
+      return;
+    }
+    // The persona in frame: whoever spoke last, else the first character.
+    const lastSpoken = [...messages]
+      .reverse()
+      .find((m) => m.kind === 'chat' && !isMineMsg(m) && m.senderPersonaId);
+    const persona = byId(lastSpoken?.senderPersonaId ?? null) ?? aiMembers[0];
+    setSnapBusy(true);
+    try {
+      const recent = messages
+        .filter((m) => m.kind === 'chat')
+        .slice(-10)
+        .map((m) => `${byId(m.senderPersonaId)?.name ?? 'User'}: ${m.content}`)
+        .join('\n');
+      const scenePrompt = (
+        await window.polyglot.rpGrokComplete(grokKey, settings.grokModel, [
+          {
+            role: 'system',
+            content: `You write image-generation prompts. Describe the current visual moment of this roleplay scene as a photo of ${persona.name}: setting, pose, clothing, lighting, mood. Comma-separated fragments, present tense, no character names, no dialogue, under 60 words. Output only the prompt.`,
+          },
+          { role: 'user', content: recent || 'The scene is just beginning.' },
+        ])
+      ).trim();
+      await generateAndSend({
+        persona,
+        sceneId: scene.id,
+        scenePrompt,
+        caption: '*snaps a photo*',
+      });
+      toast('Photo sent to the conversation', 'success');
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    } finally {
+      setSnapBusy(false);
     }
   };
 
@@ -321,6 +374,8 @@ export function RPChatWindow({
               key={m.id}
               text={m.content}
               image={m.image}
+              onImageClick={setLightbox}
+              voice={sender?.voice ?? ''}
               mine={mine}
               avatar={sender?.avatar ?? '🧑'}
               avatarImage={sender?.avatarImage || undefined}
@@ -439,6 +494,32 @@ export function RPChatWindow({
             🎨
           </button>
           <button
+            onClick={() => void snapScenePhoto()}
+            disabled={snapBusy}
+            title="Snap a photo of the current scene — the prompt is written automatically from the last few messages"
+            className="rounded-xl border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary disabled:opacity-60"
+          >
+            {snapBusy ? '⏳' : '📷'}
+          </button>
+          <button
+            onClick={() => {
+              unlockAudio();
+              if (!grokKey || !settings.openaiApiKey) {
+                toast('Calls need your Grok key (RP Settings) and OpenAI key (main Settings).', 'error');
+                return;
+              }
+              if (aiMembers.length === 0) {
+                toast('Add a character to the conversation first', 'error');
+                return;
+              }
+              setCallOpen(true);
+            }}
+            title="Start a voice call with this scene"
+            className="rounded-xl border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+          >
+            📞
+          </button>
+          <button
             onClick={() => void onMic()}
             title={
               recorder.state === 'recording' ? 'Stop and transcribe' : 'Dictate your message'
@@ -491,6 +572,14 @@ export function RPChatWindow({
           onClose={() => setImageOpen(false)}
         />
       )}
+      {callOpen && (
+        <RPCallOverlay
+          sceneName={scene.name}
+          personas={members}
+          onClose={() => setCallOpen(false)}
+        />
+      )}
+      {lightbox && <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />}
     </div>
   );
 }
@@ -532,6 +621,8 @@ function renderRP(text: string) {
 function MessageRow({
   text,
   image,
+  onImageClick,
+  voice,
   mine,
   avatar,
   avatarImage,
@@ -548,6 +639,8 @@ function MessageRow({
 }: {
   text: string;
   image?: string;
+  onImageClick?: (src: string) => void;
+  voice?: string;
   mine: boolean;
   avatar: string;
   avatarImage?: string;
@@ -614,8 +707,8 @@ function MessageRow({
                 src={image}
                 alt=""
                 className="mb-1.5 max-h-96 w-full cursor-pointer rounded-lg object-contain"
-                onClick={() => window.open(image, '_blank')}
-                title="Open full size"
+                onClick={() => onImageClick?.(image)}
+                title="View full size"
               />
             )}
             {renderRP(text)}
@@ -653,7 +746,7 @@ function MessageRow({
                 </button>
               </>
             )}
-            {text && <SpeakButton text={text} />}
+            {text && <SpeakButton text={text} voice={voice} />}
             {onEdit && (
               <button onClick={startEdit} className="hover:text-text-primary" title="Edit / tweak">
                 ✏️ Edit

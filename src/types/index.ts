@@ -122,6 +122,8 @@ export interface RPPersona {
   imagePrompt: string;
   loraName: string;
   loraStrength: number;
+  voice: string; // TTS voice for this persona ('' = the global Settings voice)
+  lookPrompt: string; // temporary appearance steering ("blonde hair"), between preset and scene
   createdAt: number;
   updatedAt: number;
 }
@@ -458,6 +460,8 @@ export interface WickedAPI {
         | 'imagePrompt'
         | 'loraName'
         | 'loraStrength'
+        | 'voice'
+        | 'lookPrompt'
       >
     >
   ): Promise<void>;
