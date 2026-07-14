@@ -20,6 +20,7 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl);
   const [comfyCheckpoint, setComfyCheckpoint] = useState(settings.comfyCheckpoint);
   const [comfyWorkflow, setComfyWorkflow] = useState(settings.comfyWorkflow);
+  const [comfyLaunchPath, setComfyLaunchPath] = useState(settings.comfyLaunchPath);
   const [checkpoints, setCheckpoints] = useState<string[]>([]);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
       comfyUrl,
       comfyCheckpoint,
       comfyWorkflow,
+      comfyLaunchPath,
     });
     toast('RP settings saved', 'success');
     onClose();
@@ -261,6 +263,29 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
                 )}
               </select>
             </div>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                value={comfyLaunchPath}
+                onChange={(e) => setComfyLaunchPath(e.target.value)}
+                placeholder={'Auto-start: ComfyUI folder, e.g. C:\\ComfyUI_windows_portable'}
+                className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+              <button
+                onClick={async () => {
+                  const p = await window.polyglot.comfyChooseFolder();
+                  if (p) setComfyLaunchPath(p);
+                }}
+                className="rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+              >
+                Browse…
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              With a folder set, WICKED starts ComfyUI silently in the background when it launches
+              and stops it when you quit — you only press <strong>Load</strong> on the VRAM chip.
+              Leave empty to keep starting ComfyUI yourself. Applies on next launch (or use ▶
+              Start on the chip).
+            </p>
             <details className="mt-2">
               <summary className="cursor-pointer text-xs text-text-muted hover:text-text-primary">
                 Advanced: custom workflow (API format, {'{{PROMPT}}'} / {'{{SEED}}'} placeholders)

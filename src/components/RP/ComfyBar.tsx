@@ -18,7 +18,8 @@ export function ComfyBar() {
         if (alive) setStatus(s);
       });
     poll();
-    const t = setInterval(poll, 10_000);
+    // 4s keeps the "Starting…" → ready transition snappy; the call is local.
+    const t = setInterval(poll, 4_000);
     return () => {
       alive = false;
       clearInterval(t);
@@ -28,9 +29,40 @@ export function ComfyBar() {
   if (!status) return null;
 
   if (!status.reachable) {
+    // WICKED launched it and it's still booting (~10-30s).
+    if (status.processRunning) {
+      return (
+        <span
+          title="ComfyUI is starting in the background…"
+          className="animate-pulse rounded-lg border border-edge px-2 py-1 text-xs text-text-muted"
+        >
+          🎨 Starting…
+        </span>
+      );
+    }
+    // Managed but not running (crashed or stopped) — offer a restart.
+    if (status.managed) {
+      return (
+        <div
+          title={status.lastLog || 'ComfyUI is not running'}
+          className="flex items-center gap-1 rounded-lg border border-edge px-2 py-1 text-xs"
+        >
+          <span className="text-text-muted">🎨 Images: stopped</span>
+          <button
+            onClick={() => {
+              void window.polyglot.comfyLaunch();
+              toast('Starting ComfyUI…', 'info');
+            }}
+            className="rounded px-1.5 py-0.5 text-accent hover:bg-accent/10"
+          >
+            ▶ Start
+          </button>
+        </div>
+      );
+    }
     return (
       <span
-        title="Start ComfyUI to enable local image generation (see RP Settings → Local images)"
+        title="Start ComfyUI to enable local image generation — or set a launch path in RP Settings → Local images so WICKED starts it for you"
         className="rounded-lg border border-edge px-2 py-1 text-xs text-text-muted/70"
       >
         🎨 Images: off

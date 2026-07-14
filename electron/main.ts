@@ -12,6 +12,7 @@ import * as brainFolder from './brainFolder';
 import * as projectBoard from './projectBoard';
 import * as dataRoot from './dataRoot';
 import * as comfy from './comfy';
+import * as comfyLauncher from './comfyLauncher';
 import * as webPortal from './webPortal';
 import * as mcp from './mcp';
 import type { McpServerConfig } from './mcp';
@@ -85,6 +86,7 @@ app.whenReady().then(() => {
   webPortal.init(RENDERER_DIST);
   webPortal.sync();
   dataRoot.startBackupSchedule();
+  void comfyLauncher.autoLaunch();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -100,6 +102,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   void mcp.disconnectAll();
+  comfyLauncher.stop();
 });
 
 function mimeFromExt(ext: string): string {
@@ -268,6 +271,15 @@ function registerIpc(): void {
   ipcMain.handle('comfy:freeVram', () => comfy.freeVram());
   ipcMain.handle('comfy:loadModel', () => comfy.loadModel());
   ipcMain.handle('comfy:generate', (_e, opts: comfy.GenerateOpts) => comfy.generate(opts));
+  ipcMain.handle('comfy:launch', () => comfyLauncher.launch());
+  ipcMain.handle('comfy:chooseFolder', async () => {
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openDirectory'],
+      title: 'Choose your ComfyUI folder (the one containing run_nvidia_gpu.bat)',
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
 
   // ----- File dialogs -----
   ipcMain.handle('dialog:openFile', async () => {

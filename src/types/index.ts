@@ -262,6 +262,9 @@ export interface Settings {
   comfyUrl: string;
   comfyCheckpoint: string;
   comfyWorkflow: string; // optional custom API-format workflow with {{PROMPT}}/{{SEED}}
+  // ComfyUI folder (or launch script) that WICKED starts in the background at
+  // app launch and stops on quit. '' = the user manages ComfyUI themselves.
+  comfyLaunchPath: string;
 }
 
 // Local image generation (ComfyUI) status + installed models.
@@ -270,6 +273,9 @@ export interface ComfyStatus {
   deviceName: string;
   vramTotal: number;
   vramFree: number;
+  managed: boolean; // a launch path is configured
+  processRunning: boolean; // WICKED's managed ComfyUI process is alive
+  lastLog?: string; // last console line from the managed process (diagnostics)
   error?: string;
 }
 
@@ -537,6 +543,8 @@ export interface WickedAPI {
     steps?: number;
     seed?: number;
   }): Promise<{ image: string; seed: number }>;
+  comfyLaunch(): Promise<void>;
+  comfyChooseFolder(): Promise<string | null>;
 
   // Shell
   openExternal(path: string): Promise<void>;

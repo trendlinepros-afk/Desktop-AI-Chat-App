@@ -153,6 +153,8 @@ export const RPC_CHANNELS: Record<keyof WickedAPI, string> = {
   comfyFreeVram: 'comfy:freeVram',
   comfyLoadModel: 'comfy:loadModel',
   comfyGenerate: 'comfy:generate',
+  comfyLaunch: 'comfy:launch',
+  comfyChooseFolder: 'comfy:chooseFolder',
 
   // Shell
   openExternal: 'shell:openExternal',

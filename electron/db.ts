@@ -76,6 +76,7 @@ const DEFAULT_SETTINGS: Settings = {
   comfyUrl: 'http://127.0.0.1:8188',
   comfyCheckpoint: '',
   comfyWorkflow: '',
+  comfyLaunchPath: '',
 };
 
 export function initDb(): void {
@@ -772,6 +773,7 @@ export function getSettings(): Settings {
     comfyUrl: map.get('comfyUrl') ?? DEFAULT_SETTINGS.comfyUrl,
     comfyCheckpoint: map.get('comfyCheckpoint') ?? DEFAULT_SETTINGS.comfyCheckpoint,
     comfyWorkflow: map.get('comfyWorkflow') ?? DEFAULT_SETTINGS.comfyWorkflow,
+    comfyLaunchPath: map.get('comfyLaunchPath') ?? DEFAULT_SETTINGS.comfyLaunchPath,
   };
 }
 
