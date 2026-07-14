@@ -141,7 +141,9 @@ export interface RPPerson {
   imagePrompt: string; // appearance preset prepended to every shot
   loraName: string; // file in ComfyUI models/loras ('' while still training)
   loraStrength: number;
-  status: 'training' | 'ready';
+  // waiting = dataset prepared, but the user hasn't pressed Start in FluxGym
+  // yet; training = FluxGym is actually producing output; ready = usable.
+  status: 'waiting' | 'training' | 'ready';
   datasetSlug: string; // FluxGym dataset/output folder name ('' = made from an existing LoRA)
   previewImage: string; // small data-URL thumbnail shown in pickers
   createdAt: number;
@@ -330,6 +332,7 @@ export interface TrainingImage {
 
 // Poll result while a Person's LoRA is training in FluxGym.
 export interface TrainingCheck {
+  started: boolean; // FluxGym created its output folder — the run was actually started
   done: boolean; // the final <slug>.safetensors exists
   loraFile: string; // absolute path of the finished file ('' until done)
   checkpoints: number; // intermediate epoch saves seen so far (rough progress)
@@ -525,7 +528,7 @@ export interface WickedAPI {
     imagePrompt?: string;
     loraName?: string;
     loraStrength?: number;
-    status?: 'training' | 'ready';
+    status?: 'waiting' | 'training' | 'ready';
     datasetSlug?: string;
     previewImage?: string;
   }): Promise<RPPerson>;

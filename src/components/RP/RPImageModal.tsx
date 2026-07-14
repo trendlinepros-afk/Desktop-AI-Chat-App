@@ -141,9 +141,10 @@ export function RPImageModal({
               >
                 <option value="">None{persona?.loraName ? ' (legacy LoRA)' : ''}</option>
                 {persons.map((p) => (
-                  <option key={p.id} value={p.id} disabled={p.status === 'training'}>
+                  <option key={p.id} value={p.id} disabled={p.status !== 'ready'}>
                     {p.name}
                     {p.status === 'training' ? ' — still training' : ''}
+                    {p.status === 'waiting' ? ' — training not started' : ''}
                   </option>
                 ))}
               </select>
