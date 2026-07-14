@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useRPStore } from '../../store/rpStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
+import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { getTtsQueue, speakAppendText, transcribe, unlockAudio } from '../../lib/voice';
+import { SpeakButton } from '../Chat/SpeakButton';
 import { AddPersonModal } from './AddPersonModal';
 import { GuideModal } from './GuideModal';
 import { Avatar } from './Avatar';
@@ -40,6 +43,7 @@ export function RPChatWindow({
   const suggesting = useRPStore((s) => s.suggesting);
   const grokKey = useSettingsStore((s) => s.settings.grokApiKey);
   const rpVaultPath = useSettingsStore((s) => s.settings.rpVaultPath);
+  const settings = useSettingsStore((s) => s.settings);
   const toast = useUIStore((s) => s.toast);
 
   const [input, setInput] = useState('');
@@ -47,8 +51,11 @@ export function RPChatWindow({
   const [guideOpen, setGuideOpen] = useState(false);
   const [titleEditing, setTitleEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
+  const [autoSpeak, setAutoSpeak] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recorder = useVoiceRecorder();
+  const seenRef = useRef<Set<string>>(new Set());
 
   const scene = scenes.find((s) => s.id === activeSceneId) ?? null;
   const byId = (id: string | null): RPPersona | undefined =>
@@ -56,6 +63,29 @@ export function RPChatWindow({
   const me = personas.find((p) => p.isMe);
   const members = memberIds.map(byId).filter((p): p is RPPersona => !!p);
   const aiMembers = members.filter((p) => !p.isMe);
+
+  const isMineMsg = (m: RPMessage) =>
+    m.senderPersonaId === null || (!!me && m.senderPersonaId === me.id);
+
+  // Auto-speak resets per conversation so switching scenes never reads out a
+  // whole backlog.
+  useEffect(() => {
+    setAutoSpeak(false);
+    getTtsQueue().stop();
+  }, [activeSceneId]);
+
+  // While auto-speak is OFF, everything is marked as heard — so turning it ON
+  // only ever reads messages that arrive afterwards, in order.
+  useEffect(() => {
+    for (const m of messages) {
+      if (seenRef.current.has(m.id)) continue;
+      seenRef.current.add(m.id);
+      if (autoSpeak && m.kind === 'chat' && !isMineMsg(m) && m.content) {
+        speakAppendText(m.content, settings);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, autoSpeak]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -111,8 +141,43 @@ export function RPChatWindow({
     setTitleEditing(false);
   };
 
-  const isMine = (m: RPMessage) =>
-    m.senderPersonaId === null || (!!me && m.senderPersonaId === me.id);
+  // One-shot dictation into the RP input box.
+  const finishDictation = async () => {
+    const result = await recorder.stop();
+    if (!result) {
+      recorder.setState('idle');
+      return;
+    }
+    try {
+      const spoken = await transcribe(result.blob, result.mime, settings);
+      if (spoken) {
+        setInput((prev) => (prev ? `${prev} ${spoken}` : spoken));
+        inputRef.current?.focus();
+      }
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    } finally {
+      recorder.setState('idle');
+    }
+  };
+
+  const onMic = async () => {
+    unlockAudio();
+    if (recorder.state === 'recording') {
+      void finishDictation();
+      return;
+    }
+    if (recorder.state !== 'idle') return;
+    if (!settings.openaiApiKey) {
+      toast('Voice input needs an OpenAI API key — add one in the main Settings.', 'error');
+      return;
+    }
+    try {
+      await recorder.start({ silenceMs: 1400, maxMs: 30_000, onAutoStop: () => void finishDictation() });
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    }
+  };
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -149,6 +214,29 @@ export function RPChatWindow({
           </p>
         </div>
         {summarizing && <span className="text-xs text-brain">💭 saving memory…</span>}
+        <button
+          onClick={() => {
+            unlockAudio();
+            if (!autoSpeak && !settings.openaiApiKey) {
+              toast('Read-aloud needs an OpenAI API key — add one in the main Settings.', 'error');
+              return;
+            }
+            if (autoSpeak) getTtsQueue().stop();
+            setAutoSpeak(!autoSpeak);
+          }}
+          title={
+            autoSpeak
+              ? 'Voices ON — new replies are read aloud. Click to turn off.'
+              : 'Read new replies aloud as they arrive'
+          }
+          className={`rounded-md px-2 py-1 text-sm ${
+            autoSpeak
+              ? 'bg-accent/20 text-accent'
+              : 'text-text-muted hover:bg-hover hover:text-text-primary'
+          }`}
+        >
+          {autoSpeak ? '🔊 Voices on' : '🔇 Voices'}
+        </button>
         <button
           onClick={() => syncFromVault()}
           title="Pull the latest persona info + memory from the Obsidian vault into this conversation"
@@ -224,7 +312,7 @@ export function RPChatWindow({
             );
           }
           const sender = byId(m.senderPersonaId);
-          const mine = isMine(m);
+          const mine = isMineMsg(m);
           const isLast = i === messages.length - 1;
           return (
             <MessageRow
@@ -334,6 +422,19 @@ export function RPChatWindow({
             rows={2}
             className="max-h-40 min-h-[3rem] flex-1 resize-none rounded-xl border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
           />
+          <button
+            onClick={() => void onMic()}
+            title={
+              recorder.state === 'recording' ? 'Stop and transcribe' : 'Dictate your message'
+            }
+            className={`rounded-xl border border-edge px-3 py-2 text-sm ${
+              recorder.state === 'recording'
+                ? 'animate-pulse text-red-500'
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            {recorder.state === 'transcribing' ? '⏳' : recorder.state === 'recording' ? '🔴' : '🎤'}
+          </button>
           <button
             onClick={async () => {
               const text = await suggestReply();
@@ -518,6 +619,7 @@ function MessageRow({
                 </button>
               </>
             )}
+            {text && <SpeakButton text={text} />}
             {onEdit && (
               <button onClick={startEdit} className="hover:text-text-primary" title="Edit / tweak">
                 ✏️ Edit

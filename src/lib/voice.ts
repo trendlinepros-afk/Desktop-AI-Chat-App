@@ -290,6 +290,13 @@ export function speakText(text: string, settings: Settings, owner?: unknown): vo
   const q = getTtsQueue();
   q.stop();
   q.owner = owner ?? null;
+  speakAppendText(text, settings);
+}
+
+// Queue more speech WITHOUT interrupting what's already playing — used to
+// read incoming RP messages in arrival order.
+export function speakAppendText(text: string, settings: Settings): void {
+  const q = getTtsQueue();
   const clean = stripForSpeech(text);
   if (!clean) return;
   const { sentences, end } = splitCompleteSentences(clean + ' ', 0);
