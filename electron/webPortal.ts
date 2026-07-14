@@ -1,9 +1,11 @@
-import { ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomBytes } from 'node:crypto';
+import { generate as generateCert } from 'selfsigned';
 import * as db from './db';
 import { RPC_CHANNELS } from './rpcMap';
 import type { PortalStatus } from '../src/types';
@@ -72,7 +74,9 @@ const MIME_TYPES: Record<string, string> = {
 
 let rendererDist = '';
 let server: http.Server | null = null;
+let httpsServer: https.Server | null = null;
 let currentPort = 0;
+let currentHttpsPort = 0;
 let lastError = '';
 
 export function init(distDir: string): void {
@@ -100,13 +104,14 @@ export function sync(): void {
 
   stop();
   lastError = '';
-  const srv = http.createServer((req, res) => {
+  const onRequest = (req: http.IncomingMessage, res: http.ServerResponse) => {
     handleRequest(req, res).catch((err) => {
       console.warn('[portal]', (err as Error).message);
       if (!res.headersSent) res.writeHead(500);
       res.end('Internal error');
     });
-  });
+  };
+  const srv = http.createServer(onRequest);
   srv.on('error', (err) => {
     lastError = (err as Error).message;
     server = null;
@@ -117,22 +122,98 @@ export function sync(): void {
     console.log(`[portal] serving on port ${port}`);
   });
   server = srv;
+
+  // HTTPS twin on port+1: phone browsers refuse microphone access on plain
+  // http origins, so voice in the portal needs a secure (if self-signed)
+  // context. Failure here must never take down the http portal.
+  void startHttps(port < 65535 ? port + 1 : port - 1, onRequest);
+}
+
+async function startHttps(
+  port: number,
+  onRequest: (req: http.IncomingMessage, res: http.ServerResponse) => void
+): Promise<void> {
+  try {
+    const { key, cert } = await loadOrCreateCert();
+    const srv = https.createServer({ key, cert }, onRequest);
+    srv.on('error', (err) => {
+      console.warn('[portal] https:', (err as Error).message);
+      httpsServer = null;
+      currentHttpsPort = 0;
+    });
+    srv.listen(port, '0.0.0.0', () => {
+      currentHttpsPort = port;
+      console.log(`[portal] https serving on port ${port}`);
+    });
+    httpsServer = srv;
+  } catch (err) {
+    console.warn('[portal] https disabled:', (err as Error).message);
+  }
+}
+
+// Self-signed cert for the LAN portal, persisted in userData and regenerated
+// when the machine's LAN addresses are no longer all covered by its SANs.
+async function loadOrCreateCert(): Promise<{ key: string; cert: string; ips: string[] }> {
+  const file = path.join(app.getPath('userData'), 'portal-cert.json');
+  const ips = lanAddresses().filter((ip) => ip !== 'localhost');
+  try {
+    const saved = JSON.parse(fs.readFileSync(file, 'utf-8')) as {
+      key: string;
+      cert: string;
+      ips: string[];
+      createdAt: number;
+    };
+    const fresh = Date.now() - saved.createdAt < 9 * 365 * 24 * 3600_000;
+    if (fresh && ips.every((ip) => saved.ips.includes(ip))) return saved;
+  } catch {
+    // Missing or unreadable — generate below.
+  }
+  const pems = await generateCert([{ name: 'commonName', value: 'WICKED Portal' }], {
+    notAfterDate: new Date(Date.now() + 3650 * 24 * 3600_000),
+    keySize: 2048,
+    extensions: [
+      { name: 'basicConstraints', cA: false },
+      { name: 'keyUsage', digitalSignature: true, keyEncipherment: true },
+      { name: 'extKeyUsage', serverAuth: true },
+      {
+        name: 'subjectAltName',
+        altNames: [
+          { type: 2, value: 'localhost' },
+          { type: 7, ip: '127.0.0.1' },
+          ...ips.map((ip) => ({ type: 7 as const, ip })),
+        ],
+      },
+    ],
+  });
+  const record = { key: pems.private, cert: pems.cert, ips, createdAt: Date.now() };
+  try {
+    fs.writeFileSync(file, JSON.stringify(record), 'utf-8');
+  } catch (err) {
+    console.warn('[portal] could not persist cert:', (err as Error).message);
+  }
+  return record;
 }
 
 export function stop(): void {
   server?.close();
   server = null;
   currentPort = 0;
+  httpsServer?.close();
+  httpsServer = null;
+  currentHttpsPort = 0;
 }
 
 export function getStatus(): PortalStatus {
   const settings = db.getSettings();
   const running = !!server && server.listening;
-  const urls = running
-    ? lanAddresses().map(
-        (ip) => `http://${ip}:${currentPort}/?token=${settings.webPortalToken}`
-      )
-    : [];
+  const httpsRunning = !!httpsServer && httpsServer.listening;
+  const ips = lanAddresses();
+  const urls = [
+    ...(running ? ips.map((ip) => `http://${ip}:${currentPort}/?token=${settings.webPortalToken}`) : []),
+    ...(httpsRunning
+      ? ips.map((ip) => `https://${ip}:${currentHttpsPort}/?token=${settings.webPortalToken}`)
+      : []),
+  ];
   return {
     enabled: settings.webPortalEnabled,
     running,

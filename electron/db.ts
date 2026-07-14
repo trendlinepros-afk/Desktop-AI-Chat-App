@@ -69,6 +69,10 @@ const DEFAULT_SETTINGS: Settings = {
   webPortalEnabled: true,
   webPortalPort: 8967,
   webPortalToken: '',
+  sttModel: 'gpt-4o-mini-transcribe',
+  ttsModel: 'gpt-4o-mini-tts',
+  ttsVoice: 'alloy',
+  dataRootPath: '',
 };
 
 export function initDb(): void {
@@ -744,6 +748,10 @@ export function getSettings(): Settings {
       ? Number(map.get('webPortalPort'))
       : DEFAULT_SETTINGS.webPortalPort,
     webPortalToken: decryptSecret(map.get('webPortalToken') ?? DEFAULT_SETTINGS.webPortalToken),
+    sttModel: map.get('sttModel') ?? DEFAULT_SETTINGS.sttModel,
+    ttsModel: map.get('ttsModel') ?? DEFAULT_SETTINGS.ttsModel,
+    ttsVoice: map.get('ttsVoice') ?? DEFAULT_SETTINGS.ttsVoice,
+    dataRootPath: map.get('dataRootPath') ?? DEFAULT_SETTINGS.dataRootPath,
   };
 }
 
@@ -759,6 +767,12 @@ export function saveSettings(partial: Partial<Settings>): void {
     return [k, SECRET_KEYS.has(k) ? encryptSecret(str) : str] as [string, string];
   });
   tx(entries);
+}
+
+// Online backup of the live database (safe while the app runs — better-sqlite3
+// uses SQLite's backup API, not a file copy).
+export function backupTo(file: string): Promise<unknown> {
+  return db.backup(file);
 }
 
 export function getVaultPath(): string {

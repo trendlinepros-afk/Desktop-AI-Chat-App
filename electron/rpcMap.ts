@@ -143,6 +143,10 @@ export const RPC_CHANNELS: Record<keyof WickedAPI, string> = {
   // Web portal
   portalGetStatus: 'portal:getStatus',
 
+  // Data root & backups
+  dataGetLocations: 'data:getLocations',
+  dataConsolidate: 'data:consolidate',
+
   // Shell
   openExternal: 'shell:openExternal',
 };

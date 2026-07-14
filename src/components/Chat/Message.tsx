@@ -6,6 +6,7 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Chat, Message as MessageType } from '../../types';
 import { versionLabel, providerColor } from '../ModelSelector/modelConfig';
 import { ImageGenResult } from './ImageGenResult';
+import { SpeakButton } from './SpeakButton';
 import { useMessageActions } from '../../hooks/useMessageActions';
 
 export function Message({ message, chat }: { message: MessageType; chat: Chat }) {
@@ -112,6 +113,7 @@ export function Message({ message, chat }: { message: MessageType; chat: Chat })
               isUser ? 'justify-end' : 'justify-start'
             }`}
           >
+            {text && <SpeakButton text={text} />}
             {!isUser && text && <CopyButton text={text} />}
             {!isUser && (
               <ActionBtn label="↻ Regenerate" onClick={() => regenerateFrom(message)} />

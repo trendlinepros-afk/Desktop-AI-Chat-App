@@ -29,6 +29,10 @@ const EMPTY: Settings = {
   webPortalEnabled: true,
   webPortalPort: 8967,
   webPortalToken: '',
+  sttModel: 'gpt-4o-mini-transcribe',
+  ttsModel: 'gpt-4o-mini-tts',
+  ttsVoice: 'alloy',
+  dataRootPath: '',
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

@@ -18,7 +18,10 @@
   "mac": {
     "target": ["dmg"],
     "category": "public.app-category.productivity",
-    "icon": "build/icon.png"
+    "icon": "build/icon.png",
+    "extendInfo": {
+      "NSMicrophoneUsageDescription": "WICKED uses the microphone for voice chat and dictation."
+    }
   },
   "win": {
     "target": ["nsis"],
