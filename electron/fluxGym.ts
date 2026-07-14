@@ -251,6 +251,21 @@ export function stop(): void {
   const proc = child;
   child = null;
   if (!proc || proc.exitCode !== null || !proc.pid) return;
+  // Never take a live training run down with the app (quit, update, crash
+  // recovery): losing hours of progress is far worse than leaving FluxGym
+  // running in the background. If any prepared dataset has a started-but-
+  // unfinished run, orphan the process instead — it keeps training, and
+  // WICKED picks the result up on next launch.
+  try {
+    const trainingActive = db.rpGetPersons().some((p) => {
+      if (p.status === 'ready' || !p.datasetSlug) return false;
+      const check = checkTraining(p.datasetSlug);
+      return check.started && !check.done;
+    });
+    if (trainingActive) return;
+  } catch {
+    /* if the check itself fails, fall through and stop the process */
+  }
   if (process.platform === 'win32') {
     try {
       spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { windowsHide: true });
