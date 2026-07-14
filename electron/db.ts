@@ -1150,7 +1150,7 @@ function mapPerson(r: RPPersonRow): RPPerson {
     imagePrompt: r.image_prompt,
     loraName: r.lora_name,
     loraStrength: r.lora_strength,
-    status: r.status === 'training' ? 'training' : 'ready',
+    status: r.status === 'training' || r.status === 'waiting' ? r.status : 'ready',
     datasetSlug: r.dataset_slug,
     previewImage: r.preview_image,
     createdAt: r.created_at,
@@ -1169,7 +1169,7 @@ export function rpCreatePerson(data: {
   imagePrompt?: string;
   loraName?: string;
   loraStrength?: number;
-  status?: 'training' | 'ready';
+  status?: 'waiting' | 'training' | 'ready';
   datasetSlug?: string;
   previewImage?: string;
 }): RPPerson {

@@ -416,9 +416,10 @@ export function PersonaEditor({
                 <option value="">No person (checkpoint only{loraName ? ' / legacy LoRA' : ''})</option>
                 {persons.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.status === 'training' ? '🧬 ' : ''}
+                    {p.status !== 'ready' ? '🧬 ' : ''}
                     {p.name}
                     {p.status === 'training' ? ' — training…' : ''}
+                    {p.status === 'waiting' ? ' — not started yet' : ''}
                   </option>
                 ))}
               </select>
@@ -449,10 +450,12 @@ export function PersonaEditor({
                   />
                 )}
                 <p className="min-w-0 flex-1 truncate text-xs text-text-muted">
-                  {selectedPerson.status === 'training'
-                    ? 'Training — usable as soon as the 🧬 chip in the top bar says it\'s done.'
-                    : `Ready · ${selectedPerson.loraName || 'no LoRA'} @ ${selectedPerson.loraStrength}` +
-                      (selectedPerson.triggerWord ? ` · trigger ${selectedPerson.triggerWord}` : '')}
+                  {selectedPerson.status === 'waiting'
+                    ? 'Not training yet — click the yellow 🧬 chip in the top bar for the start steps.'
+                    : selectedPerson.status === 'training'
+                      ? 'Training — usable as soon as the 🧬 chip in the top bar says it\'s done.'
+                      : `Ready · ${selectedPerson.loraName || 'no LoRA'} @ ${selectedPerson.loraStrength}` +
+                        (selectedPerson.triggerWord ? ` · trigger ${selectedPerson.triggerWord}` : '')}
                 </p>
               </div>
             )}

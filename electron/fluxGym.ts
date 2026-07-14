@@ -151,14 +151,17 @@ function outputsDir(root: string, slug: string): string {
   return path.join(root, 'outputs', slug);
 }
 
-// Poll for training progress: FluxGym (kohya sd-scripts) drops intermediate
-// epoch files like <slug>-000004.safetensors and finally <slug>.safetensors.
+// Poll for training progress. `started` = FluxGym created its output folder
+// for this run (it writes the train script there the moment the user presses
+// Start), which is how WICKED tells "waiting for the user" from "actually
+// training". Then kohya sd-scripts drops intermediate epoch files like
+// <slug>-000004.safetensors and finally <slug>.safetensors.
 export function checkTraining(slug: string): TrainingCheck {
   const { root } = resolveRoot();
-  const none: TrainingCheck = { done: false, loraFile: '', checkpoints: 0 };
+  const none: TrainingCheck = { started: false, done: false, loraFile: '', checkpoints: 0 };
   if (!root) return none;
   const dir = outputsDir(root, slug);
-  if (!fs.existsSync(dir)) return none;
+  if (!fs.existsSync(dir) || fs.readdirSync(dir).length === 0) return none;
   let checkpoints = 0;
   for (const f of fs.readdirSync(dir)) {
     if (f.startsWith(`${slug}-`) && f.endsWith('.safetensors')) checkpoints++;
@@ -167,10 +170,10 @@ export function checkTraining(slug: string): TrainingCheck {
   if (fs.existsSync(finalFile)) {
     const stat = fs.statSync(finalFile);
     if (Date.now() - stat.mtimeMs > SETTLE_MS && stat.size > 0) {
-      return { done: true, loraFile: finalFile, checkpoints };
+      return { started: true, done: true, loraFile: finalFile, checkpoints };
     }
   }
-  return { done: false, loraFile: '', checkpoints };
+  return { started: true, done: false, loraFile: '', checkpoints };
 }
 
 // Where ComfyUI keeps LoRAs, derived from the configured launch folder

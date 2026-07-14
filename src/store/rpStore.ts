@@ -76,7 +76,7 @@ interface RPState {
     imagePrompt?: string;
     loraName?: string;
     loraStrength?: number;
-    status?: 'training' | 'ready';
+    status?: 'waiting' | 'training' | 'ready';
     datasetSlug?: string;
     previewImage?: string;
   }) => Promise<RPPerson>;

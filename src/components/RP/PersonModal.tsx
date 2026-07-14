@@ -75,7 +75,7 @@ export function PersonModal({
 
   // FluxGym status feeds the train step; keep it fresh while that UI is up.
   useEffect(() => {
-    if (mode !== 'train' && !(mode === 'edit' && existing?.status === 'training')) return;
+    if (mode !== 'train' && !(mode === 'edit' && existing && existing.status !== 'ready')) return;
     let alive = true;
     const poll = () =>
       window.polyglot.fluxGymGetStatus().then((s) => {
@@ -137,7 +137,8 @@ export function PersonModal({
         triggerWord: effectiveTrigger,
         imagePrompt: imagePrompt.trim() || `photo of ${effectiveTrigger}`,
         loraStrength,
-        status: 'training',
+        // 'waiting' until FluxGym's output folder shows the run really started.
+        status: 'waiting',
         datasetSlug: slug,
         previewImage: photos[0]?.thumb ?? '',
       });
@@ -491,7 +492,7 @@ export function PersonModal({
                 onClick={() => onClose(prepared.personId)}
                 className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
               >
-                Done — I'll get a heads-up when training finishes
+                Done — the 🧬 chip up top tracks it from here (and repeats these steps)
               </button>
             </>
           )}
@@ -499,12 +500,18 @@ export function PersonModal({
           {/* ---------- Existing-LoRA path & edit mode share the form ---------- */}
           {(mode === 'existing' || mode === 'edit') && (
             <>
-              {mode === 'edit' && existing?.status === 'training' && (
+              {mode === 'edit' && existing && existing.status !== 'ready' && (
                 <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/5 p-3 text-sm">
-                  <p className="font-medium">🧬 Still training in FluxGym</p>
+                  <p className="font-medium">
+                    {existing.status === 'waiting'
+                      ? '🧬 Not training yet — FluxGym is waiting for you'
+                      : '🧬 Still training in FluxGym'}
+                  </p>
                   <p className="mt-1 text-xs text-text-muted">
-                    WICKED checks for the finished LoRA every half minute and installs it
-                    automatically. Dataset: <code>{existing.datasetSlug}</code>
+                    {existing.status === 'waiting'
+                      ? `The dataset is prepared. In FluxGym set the LoRA name to exactly "${existing.datasetSlug}", trigger word "${existing.triggerWord}", drag in all files from the dataset folder, and press Start training. (The 🧬 chip in the top bar has these steps too.)`
+                      : 'WICKED checks for the finished LoRA every half minute and installs it automatically.'}{' '}
+                    Dataset: <code>{existing.datasetSlug}</code>
                   </p>
                   <div className="mt-2 flex gap-2">
                     <button
