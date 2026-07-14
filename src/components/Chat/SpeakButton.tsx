@@ -5,7 +5,8 @@ import { getTtsQueue, speakText, unlockAudio } from '../../lib/voice';
 
 // Per-message read-aloud. One shared TTS queue app-wide: starting a message
 // stops whatever else was speaking; clicking again while playing stops it.
-export function SpeakButton({ text }: { text: string }) {
+// `voice` overrides the global Settings voice (e.g. an RP persona's voice).
+export function SpeakButton({ text, voice = '' }: { text: string; voice?: string }) {
   const settings = useSettingsStore((s) => s.settings);
   const toast = useUIStore((s) => s.toast);
   const [speaking, setSpeaking] = useState(false);
@@ -28,7 +29,7 @@ export function SpeakButton({ text }: { text: string }) {
       queue.stop();
       return;
     }
-    speakText(text, settings, tokenRef.current);
+    speakText(text, settings, tokenRef.current, voice);
   };
 
   return (

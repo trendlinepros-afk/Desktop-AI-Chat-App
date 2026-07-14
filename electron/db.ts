@@ -219,6 +219,15 @@ export function initDb(): void {
   if (!columnExists('rp_personas', 'lora_strength')) {
     db.exec('ALTER TABLE rp_personas ADD COLUMN lora_strength REAL NOT NULL DEFAULT 0.85');
   }
+  // Per-persona TTS voice ('' = use the global Settings voice).
+  if (!columnExists('rp_personas', 'voice')) {
+    db.exec("ALTER TABLE rp_personas ADD COLUMN voice TEXT NOT NULL DEFAULT ''");
+  }
+  // Temporary appearance steering ("blonde hair for a while") layered between
+  // the identity preset and the per-shot scene prompt.
+  if (!columnExists('rp_personas', 'look_prompt')) {
+    db.exec("ALTER TABLE rp_personas ADD COLUMN look_prompt TEXT NOT NULL DEFAULT ''");
+  }
   // Personas can "send" generated images into the conversation.
   if (!columnExists('rp_scene_messages', 'image_data')) {
     db.exec("ALTER TABLE rp_scene_messages ADD COLUMN image_data TEXT NOT NULL DEFAULT ''");
@@ -936,6 +945,8 @@ interface RPPersonaRow {
   image_prompt: string | null;
   lora_name: string | null;
   lora_strength: number | null;
+  voice: string | null;
+  look_prompt: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -954,6 +965,8 @@ function mapPersona(r: RPPersonaRow): RPPersona {
     imagePrompt: r.image_prompt ?? '',
     loraName: r.lora_name ?? '',
     loraStrength: r.lora_strength ?? 0.85,
+    voice: r.voice ?? '',
+    lookPrompt: r.look_prompt ?? '',
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -995,6 +1008,8 @@ export function rpCreatePersona(data: {
     image_prompt: '',
     lora_name: '',
     lora_strength: 0.85,
+    voice: '',
+    look_prompt: '',
     created_at: now,
     updated_at: now,
   };
@@ -1033,6 +1048,8 @@ export function rpUpdatePersona(
       | 'imagePrompt'
       | 'loraName'
       | 'loraStrength'
+      | 'voice'
+      | 'lookPrompt'
     >
   >
 ): void {
@@ -1047,6 +1064,8 @@ export function rpUpdatePersona(
     model: 'model',
     imagePrompt: 'image_prompt',
     loraName: 'lora_name',
+    voice: 'voice',
+    lookPrompt: 'look_prompt',
   };
   for (const [key, col] of Object.entries(strMap)) {
     const v = (patch as Record<string, unknown>)[key];

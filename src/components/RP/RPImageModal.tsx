@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { RPPersona } from '../../types';
 import { useRPStore } from '../../store/rpStore';
 import { useUIStore } from '../../store/uiStore';
+import { generateAndSend } from '../../lib/rpImageSend';
 
 const SIZES: { label: string; w: number; h: number }[] = [
   { label: 'Square 1024×1024', w: 1024, h: 1024 },
@@ -22,8 +23,10 @@ export function RPImageModal({
   onClose: () => void;
 }) {
   const toast = useUIStore((s) => s.toast);
+  const updatePersona = useRPStore((s) => s.updatePersona);
   const [personaId, setPersonaId] = useState(personas[0]?.id ?? '');
   const [prompt, setPrompt] = useState('');
+  const [look, setLook] = useState('');
   const [sizeIdx, setSizeIdx] = useState(0);
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -31,6 +34,12 @@ export function RPImageModal({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const persona = personas.find((p) => p.id === personaId) ?? null;
+
+  // "Current look" belongs to the persona and persists between generations.
+  useEffect(() => {
+    setLook(persona?.lookPrompt ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personaId]);
 
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -47,36 +56,26 @@ export function RPImageModal({
   const generate = async () => {
     if (!persona) return;
     const scenePrompt = prompt.trim();
-    const fullPrompt = [(persona.imagePrompt ?? '').trim(), scenePrompt]
-      .filter(Boolean)
-      .join(', ');
-    if (!fullPrompt) {
-      toast('Describe the image (or set an appearance preset on the persona).', 'error');
-      return;
-    }
     setBusy(true);
     setElapsed(0);
     setPreview(null);
     timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
     try {
+      // Persist an edited "current look" so it sticks for future shots.
+      const lookTrimmed = look.trim();
+      if (lookTrimmed !== (persona.lookPrompt ?? '')) {
+        await updatePersona(persona.id, { lookPrompt: lookTrimmed });
+      }
       const size = SIZES[sizeIdx];
-      const result = await window.polyglot.comfyGenerate({
-        prompt: fullPrompt,
-        loraName: persona.loraName || undefined,
-        loraStrength: persona.loraStrength,
+      const image = await generateAndSend({
+        persona: { ...persona, lookPrompt: lookTrimmed },
+        sceneId,
+        scenePrompt,
+        caption: scenePrompt ? `*sends a photo* — ${scenePrompt}` : '*sends a photo*',
         width: size.w,
         height: size.h,
       });
-      setPreview(result.image);
-      // Into the persona's gallery + into the conversation as their message.
-      await window.polyglot.rpAddPersonaImage(persona.id, result.image);
-      const saved = await window.polyglot.rpSaveSceneMessage({
-        sceneId,
-        senderPersonaId: persona.id,
-        content: scenePrompt ? `*sends a photo* — ${scenePrompt}` : '*sends a photo*',
-        image: result.image,
-      });
-      useRPStore.setState((s) => ({ messages: [...s.messages, saved] }));
+      setPreview(image);
       toast('Image sent to the conversation', 'success');
     } catch (err) {
       toast((err as Error).message, 'error');
@@ -125,6 +124,17 @@ export function RPImageModal({
             </select>
           </div>
 
+          <div>
+            <input
+              value={look}
+              onChange={(e) => setLook(e.target.value)}
+              placeholder="Current look (persists) — e.g. blonde hair, summer dress"
+              className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+            />
+            <p className="mt-0.5 text-xs text-text-muted">
+              Sticks between shots until you change it — for temporary changes like hair color.
+            </p>
+          </div>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}

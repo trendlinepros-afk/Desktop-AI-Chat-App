@@ -5,6 +5,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { MODEL_CONFIG, PROVIDERS, defaultVersionFor } from '../ModelSelector/modelConfig';
 import { McpServerSettings } from './McpServerSettings';
+import { TTS_VOICES } from '../../lib/voice';
 import { OllamaModelManager } from './OllamaModelManager';
 import { listOllamaModels } from '../../lib/ollama';
 
@@ -454,19 +455,6 @@ function DataRootView() {
   );
 }
 
-const TTS_VOICES = [
-  'alloy',
-  'ash',
-  'ballad',
-  'coral',
-  'echo',
-  'fable',
-  'nova',
-  'onyx',
-  'sage',
-  'shimmer',
-  'verse',
-];
 
 // Live state of the LAN web portal: whether it's serving and the link(s) to
 // open on another device. Reflects saved settings, not the unsaved draft.

@@ -5,6 +5,7 @@ import { useUIStore } from '../../store/uiStore';
 import { GROK_MODELS } from '../../lib/rpChat';
 import { generateImage } from '../../hooks/useChat';
 import { resizeDataUrl } from '../../lib/rpImage';
+import { TTS_VOICES, speakText, unlockAudio } from '../../lib/voice';
 import { Avatar } from './Avatar';
 import type { RPPersonaImage } from '../../types';
 
@@ -23,6 +24,7 @@ export function PersonaEditor({
   const loadPersonas = useRPStore((s) => s.loadPersonas);
   const defaultModel = useSettingsStore((s) => s.settings.grokModel);
   const geminiKey = useSettingsStore((s) => s.settings.geminiApiKey);
+  const appSettings = useSettingsStore((s) => s.settings);
   const toast = useUIStore((s) => s.toast);
 
   const existing = personaId ? personas.find((p) => p.id === personaId) : null;
@@ -38,6 +40,7 @@ export function PersonaEditor({
   const [imagePrompt, setImagePrompt] = useState(existing?.imagePrompt ?? '');
   const [loraName, setLoraName] = useState(existing?.loraName ?? '');
   const [loraStrength, setLoraStrength] = useState(existing?.loraStrength ?? 0.85);
+  const [voice, setVoice] = useState(existing?.voice ?? '');
   const [loras, setLoras] = useState<string[]>([]);
 
   // LoRAs installed in the user's local ComfyUI (empty when it's not running).
@@ -140,12 +143,13 @@ export function PersonaEditor({
         imagePrompt,
         loraName,
         loraStrength,
+        voice,
       });
       toast('Persona updated', 'success');
     } else {
       const persona = await createPersona({ name, avatar, avatarImage, description, greeting, model, isMe });
-      if (imagePrompt || loraName) {
-        await updatePersona(persona.id, { imagePrompt, loraName, loraStrength });
+      if (imagePrompt || loraName || voice) {
+        await updatePersona(persona.id, { imagePrompt, loraName, loraStrength, voice });
       }
       toast('Persona created', 'success');
     }
@@ -346,6 +350,44 @@ export function PersonaEditor({
               </datalist>
             </div>
           )}
+
+          {/* Spoken voice (read-aloud, Voices toggle, calls) */}
+          <div>
+            <label className="mb-1 block text-xs text-text-muted">Voice</label>
+            <div className="flex items-center gap-2">
+              <select
+                value={voice}
+                onChange={(e) => setVoice(e.target.value)}
+                className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+              >
+                <option value="">Default (main Settings voice)</option>
+                {TTS_VOICES.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  unlockAudio();
+                  if (!appSettings.openaiApiKey) {
+                    toast('Voice preview needs an OpenAI key in the main Settings.', 'error');
+                    return;
+                  }
+                  speakText(
+                    `Hi, I'm ${name.trim() || 'your persona'}. This is how I sound.`,
+                    appSettings,
+                    undefined,
+                    voice
+                  );
+                }}
+                title="Preview this voice"
+                className="rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+              >
+                ▶ Preview
+              </button>
+            </div>
+          </div>
 
           {/* Local image generation (ComfyUI) */}
           <div className="rounded-xl border border-edge bg-surface/50 p-3">
