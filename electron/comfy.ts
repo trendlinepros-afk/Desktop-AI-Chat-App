@@ -99,21 +99,45 @@ export interface GenerateOpts {
   seed?: number;
 }
 
-// Default text→image graph for the fp8 all-in-one Flux checkpoints (also fine
-// for SDXL-style checkpoints). cfg stays 1.0 — Flux uses embedded guidance.
+// Each checkpoint family needs very different sampling settings — running an
+// SDXL/SD1.5 checkpoint with Flux's cfg=1/no-negative setup is the classic
+// cause of melted, broken people. Detect the family from the filename and
+// build the right graph automatically so the user never tunes samplers.
+type ModelFamily = 'flux' | 'sdxl';
+
+function familyOf(checkpoint: string): ModelFamily {
+  return /flux/i.test(checkpoint) ? 'flux' : 'sdxl';
+}
+
+// Steps used when the caller doesn't ask for a specific count.
+export function defaultSteps(checkpoint: string): number {
+  return familyOf(checkpoint) === 'flux' ? 20 : 28;
+}
+
+const SDXL_NEGATIVE =
+  'lowres, bad anatomy, bad hands, extra fingers, missing fingers, extra limbs, deformed, ' +
+  'disfigured, mutated, blurry, worst quality, low quality, jpeg artifacts, watermark, text';
+
 function defaultWorkflow(o: Required<Omit<GenerateOpts, 'loraName' | 'loraStrength'>> & {
   loraName: string;
   loraStrength: number;
   checkpoint: string;
 }): Record<string, unknown> {
+  const family = familyOf(o.checkpoint);
   const useLora = !!o.loraName;
   const modelSource: [string, number] = useLora ? ['lora', 0] : ['ckpt', 0];
+  // SDXL-family LoRAs also patch the text encoder, so their prompts route
+  // through the LoRA's CLIP output; Flux LoRAs are model-only.
+  const clipSource: [string, number] = useLora && family === 'sdxl' ? ['lora', 1] : ['ckpt', 1];
   const graph: Record<string, unknown> = {
     ckpt: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: o.checkpoint } },
-    pos: { class_type: 'CLIPTextEncode', inputs: { text: o.prompt, clip: ['ckpt', 1] } },
-    neg: { class_type: 'CLIPTextEncode', inputs: { text: '', clip: ['ckpt', 1] } },
+    pos: { class_type: 'CLIPTextEncode', inputs: { text: o.prompt, clip: clipSource } },
+    neg: {
+      class_type: 'CLIPTextEncode',
+      inputs: { text: family === 'flux' ? '' : SDXL_NEGATIVE, clip: clipSource },
+    },
     latent: {
-      class_type: 'EmptySD3LatentImage',
+      class_type: family === 'flux' ? 'EmptySD3LatentImage' : 'EmptyLatentImage',
       inputs: { width: o.width, height: o.height, batch_size: 1 },
     },
     sampler: {
@@ -125,9 +149,10 @@ function defaultWorkflow(o: Required<Omit<GenerateOpts, 'loraName' | 'loraStreng
         latent_image: ['latent', 0],
         seed: o.seed,
         steps: o.steps,
-        cfg: 1,
-        sampler_name: 'euler',
-        scheduler: 'simple',
+        // Flux uses embedded guidance (cfg must stay 1); SDXL needs real CFG.
+        cfg: family === 'flux' ? 1 : 6.5,
+        sampler_name: family === 'flux' ? 'euler' : 'dpmpp_2m',
+        scheduler: family === 'flux' ? 'simple' : 'karras',
         denoise: 1,
       },
     },
@@ -135,10 +160,22 @@ function defaultWorkflow(o: Required<Omit<GenerateOpts, 'loraName' | 'loraStreng
     save: { class_type: 'SaveImage', inputs: { images: ['decode', 0], filename_prefix: 'WICKED' } },
   };
   if (useLora) {
-    graph.lora = {
-      class_type: 'LoraLoaderModelOnly',
-      inputs: { lora_name: o.loraName, strength_model: o.loraStrength, model: ['ckpt', 0] },
-    };
+    graph.lora =
+      family === 'flux'
+        ? {
+            class_type: 'LoraLoaderModelOnly',
+            inputs: { lora_name: o.loraName, strength_model: o.loraStrength, model: ['ckpt', 0] },
+          }
+        : {
+            class_type: 'LoraLoader',
+            inputs: {
+              lora_name: o.loraName,
+              strength_model: o.loraStrength,
+              strength_clip: o.loraStrength,
+              model: ['ckpt', 0],
+              clip: ['ckpt', 1],
+            },
+          };
   }
   return graph;
 }
@@ -175,7 +212,7 @@ export async function generate(opts: GenerateOpts): Promise<{ image: string; see
       prompt: opts.prompt,
       width: opts.width ?? 1024,
       height: opts.height ?? 1024,
-      steps: opts.steps ?? 20,
+      steps: opts.steps ?? defaultSteps(settings.comfyCheckpoint),
       seed,
       loraName: opts.loraName ?? '',
       loraStrength: opts.loraStrength ?? 0.85,

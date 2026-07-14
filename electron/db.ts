@@ -9,6 +9,7 @@ import type {
   Message,
   Provider,
   RPMessage,
+  RPPerson,
   RPPersona,
   RPPersonaImage,
   RPScene,
@@ -77,6 +78,7 @@ const DEFAULT_SETTINGS: Settings = {
   comfyCheckpoint: '',
   comfyWorkflow: '',
   comfyLaunchPath: '',
+  fluxGymPath: '',
 };
 
 export function initDb(): void {
@@ -227,6 +229,26 @@ export function initDb(): void {
   // the identity preset and the per-shot scene prompt.
   if (!columnExists('rp_personas', 'look_prompt')) {
     db.exec("ALTER TABLE rp_personas ADD COLUMN look_prompt TEXT NOT NULL DEFAULT ''");
+  }
+  // Persons: reusable visual identities (LoRA + trigger word + preset) that
+  // personas point at instead of raw model files.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS rp_persons (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      trigger_word TEXT NOT NULL DEFAULT '',
+      image_prompt TEXT NOT NULL DEFAULT '',
+      lora_name TEXT NOT NULL DEFAULT '',
+      lora_strength REAL NOT NULL DEFAULT 0.85,
+      status TEXT NOT NULL DEFAULT 'ready',
+      dataset_slug TEXT NOT NULL DEFAULT '',
+      preview_image TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+  if (!columnExists('rp_personas', 'person_id')) {
+    db.exec("ALTER TABLE rp_personas ADD COLUMN person_id TEXT NOT NULL DEFAULT ''");
   }
   // Personas can "send" generated images into the conversation.
   if (!columnExists('rp_scene_messages', 'image_data')) {
@@ -783,6 +805,7 @@ export function getSettings(): Settings {
     comfyCheckpoint: map.get('comfyCheckpoint') ?? DEFAULT_SETTINGS.comfyCheckpoint,
     comfyWorkflow: map.get('comfyWorkflow') ?? DEFAULT_SETTINGS.comfyWorkflow,
     comfyLaunchPath: map.get('comfyLaunchPath') ?? DEFAULT_SETTINGS.comfyLaunchPath,
+    fluxGymPath: map.get('fluxGymPath') ?? DEFAULT_SETTINGS.fluxGymPath,
   };
 }
 
@@ -945,6 +968,7 @@ interface RPPersonaRow {
   image_prompt: string | null;
   lora_name: string | null;
   lora_strength: number | null;
+  person_id: string | null;
   voice: string | null;
   look_prompt: string | null;
   created_at: number;
@@ -965,6 +989,7 @@ function mapPersona(r: RPPersonaRow): RPPersona {
     imagePrompt: r.image_prompt ?? '',
     loraName: r.lora_name ?? '',
     loraStrength: r.lora_strength ?? 0.85,
+    personId: r.person_id ?? '',
     voice: r.voice ?? '',
     lookPrompt: r.look_prompt ?? '',
     createdAt: r.created_at,
@@ -1008,6 +1033,7 @@ export function rpCreatePersona(data: {
     image_prompt: '',
     lora_name: '',
     lora_strength: 0.85,
+    person_id: '',
     voice: '',
     look_prompt: '',
     created_at: now,
@@ -1048,6 +1074,7 @@ export function rpUpdatePersona(
       | 'imagePrompt'
       | 'loraName'
       | 'loraStrength'
+      | 'personId'
       | 'voice'
       | 'lookPrompt'
     >
@@ -1064,6 +1091,7 @@ export function rpUpdatePersona(
     model: 'model',
     imagePrompt: 'image_prompt',
     loraName: 'lora_name',
+    personId: 'person_id',
     voice: 'voice',
     lookPrompt: 'look_prompt',
   };
@@ -1096,6 +1124,137 @@ export function rpUpdatePersona(
 
 export function rpDeletePersona(id: string): void {
   db.prepare('DELETE FROM rp_personas WHERE id = ?').run(id);
+}
+
+// ---------- Persons (visual identities for local image generation) ----------
+
+interface RPPersonRow {
+  id: string;
+  name: string;
+  trigger_word: string;
+  image_prompt: string;
+  lora_name: string;
+  lora_strength: number;
+  status: string;
+  dataset_slug: string;
+  preview_image: string;
+  created_at: number;
+  updated_at: number;
+}
+
+function mapPerson(r: RPPersonRow): RPPerson {
+  return {
+    id: r.id,
+    name: r.name,
+    triggerWord: r.trigger_word,
+    imagePrompt: r.image_prompt,
+    loraName: r.lora_name,
+    loraStrength: r.lora_strength,
+    status: r.status === 'training' ? 'training' : 'ready',
+    datasetSlug: r.dataset_slug,
+    previewImage: r.preview_image,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function rpGetPersons(): RPPerson[] {
+  const rows = db.prepare('SELECT * FROM rp_persons ORDER BY name COLLATE NOCASE').all() as RPPersonRow[];
+  return rows.map(mapPerson);
+}
+
+export function rpCreatePerson(data: {
+  name: string;
+  triggerWord?: string;
+  imagePrompt?: string;
+  loraName?: string;
+  loraStrength?: number;
+  status?: 'training' | 'ready';
+  datasetSlug?: string;
+  previewImage?: string;
+}): RPPerson {
+  const now = Date.now();
+  const row: RPPersonRow = {
+    id: randomUUID(),
+    name: data.name,
+    trigger_word: data.triggerWord ?? '',
+    image_prompt: data.imagePrompt ?? '',
+    lora_name: data.loraName ?? '',
+    lora_strength: data.loraStrength ?? 0.85,
+    status: data.status ?? 'ready',
+    dataset_slug: data.datasetSlug ?? '',
+    preview_image: data.previewImage ?? '',
+    created_at: now,
+    updated_at: now,
+  };
+  db.prepare(
+    `INSERT INTO rp_persons (id, name, trigger_word, image_prompt, lora_name, lora_strength, status, dataset_slug, preview_image, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    row.id,
+    row.name,
+    row.trigger_word,
+    row.image_prompt,
+    row.lora_name,
+    row.lora_strength,
+    row.status,
+    row.dataset_slug,
+    row.preview_image,
+    row.created_at,
+    row.updated_at
+  );
+  return mapPerson(row);
+}
+
+export function rpUpdatePerson(
+  id: string,
+  patch: Partial<
+    Pick<
+      RPPerson,
+      | 'name'
+      | 'triggerWord'
+      | 'imagePrompt'
+      | 'loraName'
+      | 'loraStrength'
+      | 'status'
+      | 'datasetSlug'
+      | 'previewImage'
+    >
+  >
+): void {
+  const cols: string[] = [];
+  const vals: (string | number)[] = [];
+  const strMap: Record<string, string> = {
+    name: 'name',
+    triggerWord: 'trigger_word',
+    imagePrompt: 'image_prompt',
+    loraName: 'lora_name',
+    status: 'status',
+    datasetSlug: 'dataset_slug',
+    previewImage: 'preview_image',
+  };
+  for (const [key, col] of Object.entries(strMap)) {
+    const v = (patch as Record<string, unknown>)[key];
+    if (typeof v === 'string') {
+      cols.push(`${col} = ?`);
+      vals.push(v);
+    }
+  }
+  if (typeof patch.loraStrength === 'number') {
+    cols.push('lora_strength = ?');
+    vals.push(patch.loraStrength);
+  }
+  if (cols.length === 0) return;
+  cols.push('updated_at = ?');
+  vals.push(Date.now());
+  vals.push(id);
+  db.prepare(`UPDATE rp_persons SET ${cols.join(', ')} WHERE id = ?`).run(...vals);
+}
+
+export function rpDeletePerson(id: string): void {
+  db.prepare('DELETE FROM rp_persons WHERE id = ?').run(id);
+  // Personas pointing at the deleted Person fall back to their legacy fields.
+  db.prepare("UPDATE rp_personas SET person_id = '' WHERE person_id = ?").run(id);
 }
 
 // ---------- Persona profile-pic gallery ----------

@@ -37,6 +37,7 @@ const EMPTY: Settings = {
   comfyCheckpoint: '',
   comfyWorkflow: '',
   comfyLaunchPath: '',
+  fluxGymPath: '',
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

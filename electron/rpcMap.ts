@@ -99,6 +99,10 @@ export const RPC_CHANNELS: Record<keyof WickedAPI, string> = {
   rpCreatePersona: 'rp:createPersona',
   rpUpdatePersona: 'rp:updatePersona',
   rpDeletePersona: 'rp:deletePersona',
+  rpGetPersons: 'rp:getPersons',
+  rpCreatePerson: 'rp:createPerson',
+  rpUpdatePerson: 'rp:updatePerson',
+  rpDeletePerson: 'rp:deletePerson',
   rpGetPersonaImages: 'rp:getPersonaImages',
   rpAddPersonaImage: 'rp:addPersonaImage',
   rpDeletePersonaImage: 'rp:deletePersonaImage',
@@ -155,6 +159,17 @@ export const RPC_CHANNELS: Record<keyof WickedAPI, string> = {
   comfyGenerate: 'comfy:generate',
   comfyLaunch: 'comfy:launch',
   comfyChooseFolder: 'comfy:chooseFolder',
+
+  // FluxGym (LoRA training)
+  fluxGymGetStatus: 'fluxgym:getStatus',
+  fluxGymChooseFolder: 'fluxgym:chooseFolder',
+  fluxGymPickImages: 'fluxgym:pickImages',
+  fluxGymPrepareDataset: 'fluxgym:prepareDataset',
+  fluxGymCheckTraining: 'fluxgym:checkTraining',
+  fluxGymInstallLora: 'fluxgym:installLora',
+  fluxGymLaunch: 'fluxgym:launch',
+  fluxGymOpenUi: 'fluxgym:openUi',
+  fluxGymOpenDataset: 'fluxgym:openDataset',
 
   // Shell
   openExternal: 'shell:openExternal',

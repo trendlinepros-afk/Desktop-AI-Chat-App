@@ -13,6 +13,7 @@ import * as projectBoard from './projectBoard';
 import * as dataRoot from './dataRoot';
 import * as comfy from './comfy';
 import * as comfyLauncher from './comfyLauncher';
+import * as fluxGym from './fluxGym';
 import * as webPortal from './webPortal';
 import * as mcp from './mcp';
 import type { McpServerConfig } from './mcp';
@@ -103,6 +104,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   void mcp.disconnectAll();
   comfyLauncher.stop();
+  fluxGym.stop();
 });
 
 function mimeFromExt(ext: string): string {
@@ -281,6 +283,28 @@ function registerIpc(): void {
     return result.filePaths[0];
   });
 
+  // ----- FluxGym (LoRA training for Persons) -----
+  ipcMain.handle('fluxgym:getStatus', () => fluxGym.getStatus());
+  ipcMain.handle('fluxgym:chooseFolder', async () => {
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openDirectory'],
+      title: 'Choose your FluxGym folder (contains app.py — e.g. pinokio\\api\\fluxgym.git)',
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+  ipcMain.handle('fluxgym:pickImages', () => fluxGym.pickImages(win));
+  ipcMain.handle(
+    'fluxgym:prepareDataset',
+    (_e, slug: string, triggerWord: string, imagePaths: string[]) =>
+      fluxGym.prepareDataset(slug, triggerWord, imagePaths)
+  );
+  ipcMain.handle('fluxgym:checkTraining', (_e, slug: string) => fluxGym.checkTraining(slug));
+  ipcMain.handle('fluxgym:installLora', (_e, slug: string) => fluxGym.installLora(slug));
+  ipcMain.handle('fluxgym:launch', () => fluxGym.launch());
+  ipcMain.handle('fluxgym:openUi', () => fluxGym.openUi());
+  ipcMain.handle('fluxgym:openDataset', (_e, slug: string) => fluxGym.openDataset(slug));
+
   // ----- File dialogs -----
   ipcMain.handle('dialog:openFile', async () => {
     const result = await dialog.showOpenDialog(win!, {
@@ -449,6 +473,12 @@ function registerIpc(): void {
     db.rpDeletePersona(id);
     safeVault(() => rpMemory.deletePersonaProfile(id), undefined);
   });
+
+  // Persons (visual identities: LoRA + trigger word + appearance preset)
+  ipcMain.handle('rp:getPersons', () => db.rpGetPersons());
+  ipcMain.handle('rp:createPerson', (_e, data) => db.rpCreatePerson(data));
+  ipcMain.handle('rp:updatePerson', (_e, id: string, patch) => db.rpUpdatePerson(id, patch));
+  ipcMain.handle('rp:deletePerson', (_e, id: string) => db.rpDeletePerson(id));
   ipcMain.handle('rp:getPersonaImages', (_e, personaId: string) =>
     db.rpGetPersonaImages(personaId)
   );

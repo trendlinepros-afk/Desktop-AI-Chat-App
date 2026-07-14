@@ -118,12 +118,32 @@ export interface RPPersona {
   model: string; // Grok model used for this persona
   isMe: boolean; // marks the persona that represents YOU (your background)
   // Local image generation (ComfyUI): standing appearance prompt + which
-  // installed LoRA (if any) renders this persona consistently.
+  // installed LoRA (if any) renders this persona consistently. Legacy — new
+  // personas point at a Person (personId) instead, which bundles all of this.
   imagePrompt: string;
   loraName: string;
   loraStrength: number;
+  personId: string; // selected Person (visual identity); '' = use the legacy fields above
   voice: string; // TTS voice for this persona ('' = the global Settings voice)
   lookPrompt: string; // temporary appearance steering ("blonde hair"), between preset and scene
+  createdAt: number;
+  updatedAt: number;
+}
+
+// A "Person": a reusable visual identity for local image generation — one
+// trained LoRA + its trigger word + a standing appearance prompt, bundled so
+// personas never deal with raw model files. A character can have several
+// Persons (different moods/looks) and switch between them.
+export interface RPPerson {
+  id: string;
+  name: string; // e.g. "Sarah — casual" or "Sarah — gothic"
+  triggerWord: string; // the token the LoRA was trained on (e.g. sarah_casual)
+  imagePrompt: string; // appearance preset prepended to every shot
+  loraName: string; // file in ComfyUI models/loras ('' while still training)
+  loraStrength: number;
+  status: 'training' | 'ready';
+  datasetSlug: string; // FluxGym dataset/output folder name ('' = made from an existing LoRA)
+  previewImage: string; // small data-URL thumbnail shown in pickers
   createdAt: number;
   updatedAt: number;
 }
@@ -267,6 +287,9 @@ export interface Settings {
   // ComfyUI folder (or launch script) that WICKED starts in the background at
   // app launch and stops on quit. '' = the user manages ComfyUI themselves.
   comfyLaunchPath: string;
+  // FluxGym folder (Pinokio install or plain checkout) used to train Person
+  // LoRAs. '' = auto-detect the usual Pinokio locations.
+  fluxGymPath: string;
 }
 
 // Local image generation (ComfyUI) status + installed models.
@@ -284,6 +307,32 @@ export interface ComfyStatus {
 export interface ComfyModels {
   checkpoints: string[];
   loras: string[];
+}
+
+// FluxGym (LoRA trainer) install/run state, shown in the Person wizard.
+export interface FluxGymStatus {
+  installed: boolean; // a FluxGym folder was found (configured or auto-detected)
+  root: string; // the resolved folder ('' when not found)
+  autoDetected: boolean; // root came from probing Pinokio's usual locations
+  running: boolean; // the Gradio UI answers on its port
+  url: string; // where the UI lives (http://127.0.0.1:7860)
+  processRunning: boolean; // WICKED's own managed FluxGym process is alive
+  error?: string;
+}
+
+// An image chosen for LoRA training: full path stays in the main process;
+// only a small thumbnail crosses the IPC boundary.
+export interface TrainingImage {
+  path: string;
+  name: string;
+  thumb: string; // small data-URL preview
+}
+
+// Poll result while a Person's LoRA is training in FluxGym.
+export interface TrainingCheck {
+  done: boolean; // the final <slug>.safetensors exists
+  loraFile: string; // absolute path of the finished file ('' until done)
+  checkpoints: number; // intermediate epoch saves seen so far (rough progress)
 }
 
 // Where everything lives on disk (Settings → Data & backup).
@@ -460,12 +509,43 @@ export interface WickedAPI {
         | 'imagePrompt'
         | 'loraName'
         | 'loraStrength'
+        | 'personId'
         | 'voice'
         | 'lookPrompt'
       >
     >
   ): Promise<void>;
   rpDeletePersona(id: string): Promise<void>;
+
+  // Persons — reusable visual identities (LoRA + trigger word + preset)
+  rpGetPersons(): Promise<RPPerson[]>;
+  rpCreatePerson(data: {
+    name: string;
+    triggerWord?: string;
+    imagePrompt?: string;
+    loraName?: string;
+    loraStrength?: number;
+    status?: 'training' | 'ready';
+    datasetSlug?: string;
+    previewImage?: string;
+  }): Promise<RPPerson>;
+  rpUpdatePerson(
+    id: string,
+    patch: Partial<
+      Pick<
+        RPPerson,
+        | 'name'
+        | 'triggerWord'
+        | 'imagePrompt'
+        | 'loraName'
+        | 'loraStrength'
+        | 'status'
+        | 'datasetSlug'
+        | 'previewImage'
+      >
+    >
+  ): Promise<void>;
+  rpDeletePerson(id: string): Promise<void>;
 
   // Persona profile-pic gallery + daily rotation
   rpGetPersonaImages(personaId: string): Promise<RPPersonaImage[]>;
@@ -549,6 +629,21 @@ export interface WickedAPI {
   }): Promise<{ image: string; seed: number }>;
   comfyLaunch(): Promise<void>;
   comfyChooseFolder(): Promise<string | null>;
+
+  // FluxGym — in-app LoRA training pipeline for Persons
+  fluxGymGetStatus(): Promise<FluxGymStatus>;
+  fluxGymChooseFolder(): Promise<string | null>;
+  fluxGymPickImages(): Promise<TrainingImage[]>;
+  fluxGymPrepareDataset(
+    slug: string,
+    triggerWord: string,
+    imagePaths: string[]
+  ): Promise<{ dir: string; count: number }>;
+  fluxGymCheckTraining(slug: string): Promise<TrainingCheck>;
+  fluxGymInstallLora(slug: string): Promise<string>; // → lora filename now visible to ComfyUI
+  fluxGymLaunch(): Promise<{ started: boolean; message: string }>;
+  fluxGymOpenUi(): Promise<void>;
+  fluxGymOpenDataset(slug: string): Promise<void>;
 
   // Shell
   openExternal(path: string): Promise<void>;
