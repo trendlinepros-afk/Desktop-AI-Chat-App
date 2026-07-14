@@ -147,6 +147,25 @@ export function isToolStatus(s: string): boolean {
   return /🛠️\s*Running \d+ tool call/u.test(s);
 }
 
+// RP messages blend *asterisk narration* with spoken dialogue. On calls and
+// read-aloud only the dialogue should be voiced — nobody says "she leans
+// closer, her smile fading" down a phone line. Drops *…* spans (and whole-line
+// (parenthetical) stage directions), then tidies the leftover punctuation.
+// Returns '' for pure-narration messages so callers can skip them entirely.
+export function dialogueOnly(text: string): string {
+  return (
+    text
+      .replace(/\*\*([^*]+)\*\*/g, '*$1*') // treat **bold** narration like *narration*
+      .replace(/\*[^*\n]*(\*|$)/gm, ' ') // *narration* spans, incl. unclosed at line end
+      .replace(/\*/g, ' ') // any stray asterisks left over
+      .replace(/^\s*[([][^)\]]*[)\]]\s*$/gm, ' ') // whole-line (stage directions) / [notes]
+      .replace(/\s+([,.!?;:])/g, '$1') // orphaned punctuation after removals
+      .replace(/^[\s,;:.—–-]+|[\s—–-]+$/g, '') // dangling separators at the edges
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
 // ---------- Text-to-speech queue ----------
 
 // One app-wide queue: sentences go in, speech comes out in order. The first

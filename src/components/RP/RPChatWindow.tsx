@@ -3,7 +3,7 @@ import { useRPStore } from '../../store/rpStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
-import { getTtsQueue, speakAppendText, transcribe, unlockAudio } from '../../lib/voice';
+import { dialogueOnly, getTtsQueue, speakAppendText, transcribe, unlockAudio } from '../../lib/voice';
 import { SpeakButton } from '../Chat/SpeakButton';
 import { AddPersonModal } from './AddPersonModal';
 import { GuideModal } from './GuideModal';
@@ -89,7 +89,9 @@ export function RPChatWindow({
       if (seenRef.current.has(m.id)) continue;
       seenRef.current.add(m.id);
       if (autoSpeak && m.kind === 'chat' && !isMineMsg(m) && m.content) {
-        speakAppendText(m.content, settings, byId(m.senderPersonaId)?.voice ?? '');
+        // Voices toggle reads only the dialogue, not the *narration* around it.
+        const dialogue = dialogueOnly(m.content);
+        if (dialogue) speakAppendText(dialogue, settings, byId(m.senderPersonaId)?.voice ?? '');
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

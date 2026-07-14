@@ -4,7 +4,7 @@ import { useRPStore } from '../../store/rpStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
 import { getMicStream, useVoiceRecorder } from '../../hooks/useVoiceRecorder';
-import { getTtsQueue, speakAppendText, transcribe } from '../../lib/voice';
+import { dialogueOnly, getTtsQueue, speakAppendText, transcribe } from '../../lib/voice';
 
 type Phase = 'listening' | 'transcribing' | 'thinking' | 'speaking';
 
@@ -74,7 +74,11 @@ export function RPCallOverlay({
         const sender = personasRef.current.find((p) => p.id === m.senderPersonaId);
         const isUser = m.senderPersonaId === null || !!sender?.isMe;
         if (!activeRef.current || isUser || m.kind !== 'chat' || !m.content) continue;
-        speakAppendText(m.content, settingsRef.current, sender?.voice ?? '');
+        // On a call, only speak the character's actual words — never the
+        // *narration* around them. Pure-narration messages stay silent.
+        const dialogue = dialogueOnly(m.content);
+        if (!dialogue) continue;
+        speakAppendText(dialogue, settingsRef.current, sender?.voice ?? '');
         setPhase('speaking');
       }
     });
