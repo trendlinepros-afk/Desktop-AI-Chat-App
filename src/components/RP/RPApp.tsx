@@ -7,12 +7,14 @@ import { SceneEditor } from './SceneEditor';
 import { RPChatWindow } from './RPChatWindow';
 import { RPSettingsModal } from './RPSettingsModal';
 import { ComfyBar } from './ComfyBar';
+import { TrainingWatcher } from './TrainingWatcher';
 
 // The Role-Play side of the app — a full-screen overlay with its own personas,
 // group conversations, settings and memory, entirely separate from the main app.
 export function RPApp() {
   const setRpOpen = useUIStore((s) => s.setRpOpen);
   const loadPersonas = useRPStore((s) => s.loadPersonas);
+  const loadPersons = useRPStore((s) => s.loadPersons);
   const loadScenes = useRPStore((s) => s.loadScenes);
 
   const [personaEditor, setPersonaEditor] = useState<{ open: boolean; id: string | null }>({
@@ -37,12 +39,13 @@ export function RPApp() {
       // Rotate any "auto-change daily" avatars that are due, then load.
       await window.polyglot.rpRotateDueAvatars?.();
       await loadPersonas();
+      await loadPersons();
       await loadScenes();
       // Mirror existing personas into the vault (if configured) so the roster
       // shows up in Obsidian without needing an edit first.
       window.polyglot.rpSyncProfiles?.();
     })();
-  }, [loadPersonas, loadScenes]);
+  }, [loadPersonas, loadPersons, loadScenes]);
 
   const anyModalOpen = personaEditor.open || sceneEditor.open || settingsOpen;
   useEffect(() => {
@@ -79,6 +82,7 @@ export function RPApp() {
           <h1 className="text-sm font-semibold">RP — Role-Play Studio</h1>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <TrainingWatcher />
           <ComfyBar />
           <button
             onClick={() => setSettingsOpen(true)}

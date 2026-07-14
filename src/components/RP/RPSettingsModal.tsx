@@ -21,6 +21,7 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
   const [comfyCheckpoint, setComfyCheckpoint] = useState(settings.comfyCheckpoint);
   const [comfyWorkflow, setComfyWorkflow] = useState(settings.comfyWorkflow);
   const [comfyLaunchPath, setComfyLaunchPath] = useState(settings.comfyLaunchPath);
+  const [fluxGymPath, setFluxGymPath] = useState(settings.fluxGymPath);
   const [checkpoints, setCheckpoints] = useState<string[]>([]);
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
       comfyCheckpoint,
       comfyWorkflow,
       comfyLaunchPath,
+      fluxGymPath,
     });
     toast('RP settings saved', 'success');
     onClose();
@@ -300,8 +302,35 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
             </details>
             <p className="mt-1 text-xs text-text-muted">
               Needs ComfyUI running on this PC (see the setup guide). Generation is available in a
-              conversation via the 🎨 button; each persona's LoRA + appearance preset live in its
-              editor.
+              conversation via the 🎨 button; each persona picks its <strong>person</strong> (a
+              trained face) in the persona editor.
+            </p>
+          </div>
+
+          {/* LoRA training (FluxGym) */}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">🧬 LoRA training (FluxGym)</h3>
+            <div className="flex items-center gap-2">
+              <input
+                value={fluxGymPath}
+                onChange={(e) => setFluxGymPath(e.target.value)}
+                placeholder={'FluxGym folder — empty = auto-detect Pinokio (pinokio\\api\\fluxgym.git)'}
+                className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+              <button
+                onClick={async () => {
+                  const p = await window.polyglot.fluxGymChooseFolder();
+                  if (p) setFluxGymPath(p);
+                }}
+                className="rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+              >
+                Browse…
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              Used by <strong>＋ New person → Train a new face</strong> in the persona editor.
+              WICKED finds Pinokio installs automatically; only set this if yours lives somewhere
+              unusual.
             </p>
           </div>
         </div>

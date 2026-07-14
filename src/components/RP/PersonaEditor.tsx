@@ -7,6 +7,7 @@ import { generateImage } from '../../hooks/useChat';
 import { resizeDataUrl } from '../../lib/rpImage';
 import { TTS_VOICES, speakText, unlockAudio } from '../../lib/voice';
 import { Avatar } from './Avatar';
+import { PersonModal } from './PersonModal';
 import type { RPPersonaImage } from '../../types';
 
 // Create or edit a persona. `personaId === null` means create.
@@ -18,10 +19,12 @@ export function PersonaEditor({
   onClose: () => void;
 }) {
   const personas = useRPStore((s) => s.personas);
+  const persons = useRPStore((s) => s.persons);
   const createPersona = useRPStore((s) => s.createPersona);
   const updatePersona = useRPStore((s) => s.updatePersona);
   const deletePersona = useRPStore((s) => s.deletePersona);
   const loadPersonas = useRPStore((s) => s.loadPersonas);
+  const loadPersons = useRPStore((s) => s.loadPersons);
   const defaultModel = useSettingsStore((s) => s.settings.grokModel);
   const geminiKey = useSettingsStore((s) => s.settings.geminiApiKey);
   const appSettings = useSettingsStore((s) => s.settings);
@@ -40,16 +43,26 @@ export function PersonaEditor({
   const [imagePrompt, setImagePrompt] = useState(existing?.imagePrompt ?? '');
   const [loraName, setLoraName] = useState(existing?.loraName ?? '');
   const [loraStrength, setLoraStrength] = useState(existing?.loraStrength ?? 0.85);
+  const [personId, setPersonId] = useState(existing?.personId ?? '');
   const [voice, setVoice] = useState(existing?.voice ?? '');
   const [loras, setLoras] = useState<string[]>([]);
+  const [personModal, setPersonModal] = useState<{ open: boolean; id: string | null }>({
+    open: false,
+    id: null,
+  });
 
-  // LoRAs installed in the user's local ComfyUI (empty when it's not running).
+  // LoRAs installed in the user's local ComfyUI (empty when it's not running),
+  // for the legacy raw-LoRA fallback. Persons are the primary path now.
   useEffect(() => {
+    loadPersons();
     window.polyglot
       .comfyListModels()
       .then((m) => setLoras(m.loras))
       .catch(() => setLoras([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const selectedPerson = persons.find((p) => p.id === personId);
 
   const [gallery, setGallery] = useState<RPPersonaImage[]>([]);
   const [genPrompt, setGenPrompt] = useState('');
@@ -62,12 +75,13 @@ export function PersonaEditor({
   useEffect(() => {
     refreshGallery();
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onClose();
+      // The nested Person modal owns Escape while it's open.
+      if (e.key === 'Escape' && !busy && !personModal.open) onClose();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onClose, busy]);
+  }, [onClose, busy, personModal.open]);
 
   const modelOptions = Array.from(new Set([model, ...GROK_MODELS]));
 
@@ -143,13 +157,14 @@ export function PersonaEditor({
         imagePrompt,
         loraName,
         loraStrength,
+        personId,
         voice,
       });
       toast('Persona updated', 'success');
     } else {
       const persona = await createPersona({ name, avatar, avatarImage, description, greeting, model, isMe });
-      if (imagePrompt || loraName || voice) {
-        await updatePersona(persona.id, { imagePrompt, loraName, loraStrength, voice });
+      if (imagePrompt || loraName || personId || voice) {
+        await updatePersona(persona.id, { imagePrompt, loraName, loraStrength, personId, voice });
       }
       toast('Persona created', 'success');
     }
@@ -389,51 +404,120 @@ export function PersonaEditor({
             </div>
           </div>
 
-          {/* Local image generation (ComfyUI) */}
+          {/* Photos: which Person (visual identity) this character looks like */}
           <div className="rounded-xl border border-edge bg-surface/50 p-3">
-            <div className="mb-2 text-sm font-medium">🎨 Local image generator</div>
-            <label className="mb-1 block text-xs text-text-muted">
-              Appearance preset — prepended to every image prompt for this persona
-            </label>
-            <textarea
-              value={imagePrompt}
-              onChange={(e) => setImagePrompt(e.target.value)}
-              rows={2}
-              placeholder="e.g. photo of oflx_you woman, red hair, elegant style"
-              className="w-full resize-none rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-            />
-            <div className="mt-2 flex items-center gap-2">
-              <label className="text-xs text-text-muted">LoRA</label>
+            <div className="mb-2 text-sm font-medium">📸 Photos — who do they look like?</div>
+            <div className="flex items-center gap-2">
               <select
-                value={loraName}
-                onChange={(e) => setLoraName(e.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-edge bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+                value={personId}
+                onChange={(e) => setPersonId(e.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-edge bg-surface px-2 py-2 text-sm outline-none focus:border-accent"
               >
-                <option value="">None</option>
-                {loras.map((l) => (
-                  <option key={l} value={l}>
-                    {l}
+                <option value="">No person (checkpoint only{loraName ? ' / legacy LoRA' : ''})</option>
+                {persons.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.status === 'training' ? '🧬 ' : ''}
+                    {p.name}
+                    {p.status === 'training' ? ' — training…' : ''}
                   </option>
                 ))}
-                {loraName && !loras.includes(loraName) && (
-                  <option value={loraName}>{loraName} (ComfyUI offline)</option>
-                )}
               </select>
-              <label className="text-xs text-text-muted">Strength</label>
-              <input
-                type="number"
-                min={0}
-                max={2}
-                step={0.05}
-                value={loraStrength}
-                onChange={(e) => setLoraStrength(Number(e.target.value) || 0)}
-                className="w-20 rounded-lg border border-edge bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+              <button
+                onClick={() => setPersonModal({ open: true, id: null })}
+                title="Train a new face from photos, or wrap an existing LoRA"
+                className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent/90"
+              >
+                ＋ New person
+              </button>
+              {selectedPerson && (
+                <button
+                  onClick={() => setPersonModal({ open: true, id: selectedPerson.id })}
+                  title="Edit this person"
+                  className="shrink-0 rounded-lg border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+                >
+                  ✎
+                </button>
+              )}
+            </div>
+            {selectedPerson && (
+              <div className="mt-2 flex items-center gap-2 rounded-lg border border-edge bg-surface px-2 py-1.5">
+                {selectedPerson.previewImage && (
+                  <img
+                    src={selectedPerson.previewImage}
+                    alt=""
+                    className="h-9 w-9 rounded-md object-cover"
+                  />
+                )}
+                <p className="min-w-0 flex-1 truncate text-xs text-text-muted">
+                  {selectedPerson.status === 'training'
+                    ? 'Training — usable as soon as the 🧬 chip in the top bar says it\'s done.'
+                    : `Ready · ${selectedPerson.loraName || 'no LoRA'} @ ${selectedPerson.loraStrength}` +
+                      (selectedPerson.triggerWord ? ` · trigger ${selectedPerson.triggerWord}` : '')}
+                </p>
+              </div>
+            )}
+            <p className="mt-2 text-xs text-text-muted">
+              A <strong>person</strong> is a trained face. Create several for one character
+              (different moods or styles) and switch here anytime — prompts, LoRA and trigger word
+              are handled for you.
+            </p>
+            <div className="mt-2">
+              <label className="mb-1 block text-xs text-text-muted">
+                {personId
+                  ? 'Extra style notes for this persona (added after the person\'s preset)'
+                  : 'Appearance preset — prepended to every image prompt for this persona'}
+              </label>
+              <textarea
+                value={imagePrompt}
+                onChange={(e) => setImagePrompt(e.target.value)}
+                rows={2}
+                placeholder={
+                  personId
+                    ? 'e.g. always in a leather jacket, moody lighting'
+                    : 'e.g. photo of a woman, red hair, elegant style'
+                }
+                className="w-full resize-none rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
               />
             </div>
-            <p className="mt-1 text-xs text-text-muted">
-              LoRAs are the files in ComfyUI's <code>models\loras</code> folder — start ComfyUI to
-              see them here. See the setup guide for training one.
-            </p>
+            {!personId && (
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs text-text-muted hover:text-text-primary">
+                  Advanced: raw LoRA (the old way)
+                </summary>
+                <div className="mt-2 flex items-center gap-2">
+                  <label className="text-xs text-text-muted">LoRA</label>
+                  <select
+                    value={loraName}
+                    onChange={(e) => setLoraName(e.target.value)}
+                    className="min-w-0 flex-1 rounded-lg border border-edge bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+                  >
+                    <option value="">None</option>
+                    {loras.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                    {loraName && !loras.includes(loraName) && (
+                      <option value={loraName}>{loraName} (ComfyUI offline)</option>
+                    )}
+                  </select>
+                  <label className="text-xs text-text-muted">Strength</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    value={loraStrength}
+                    onChange={(e) => setLoraStrength(Number(e.target.value) || 0)}
+                    className="w-20 rounded-lg border border-edge bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-text-muted">
+                  Tip: wrap this LoRA as a person (＋ New person → “Use a LoRA I already have”) so
+                  you never have to think about these fields again.
+                </p>
+              </details>
+            )}
           </div>
         </div>
 
@@ -464,6 +548,17 @@ export function PersonaEditor({
           </div>
         </div>
       </div>
+
+      {personModal.open && (
+        <PersonModal
+          personId={personModal.id}
+          onClose={(createdId) => {
+            setPersonModal({ open: false, id: null });
+            // A person made (or trained) just now becomes this persona's pick.
+            if (createdId) setPersonId(createdId);
+          }}
+        />
+      )}
     </div>
   );
 }
