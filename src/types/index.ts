@@ -245,6 +245,23 @@ export interface Settings {
   webPortalEnabled: boolean;
   webPortalPort: number;
   webPortalToken: string;
+  // Voice (dictation, call mode, read-aloud) — powered by the OpenAI key.
+  sttModel: string; // speech-to-text model
+  ttsModel: string; // text-to-speech model
+  ttsVoice: string; // text-to-speech voice name
+  // One root folder (e.g. a network share) holding all file-based app data
+  // plus rolling database backups. '' = not configured.
+  dataRootPath: string;
+}
+
+// Where everything lives on disk (Settings → Data & backup).
+export interface DataLocations {
+  dataRootPath: string;
+  dbPath: string; // the live SQLite database (always local — see dataRoot.ts)
+  vaultPath: string;
+  rpVaultPath: string;
+  projectBoardPath: string;
+  lastBackupAt: number | null;
 }
 
 // Live state of the LAN web portal (Settings → Web portal).
@@ -466,6 +483,10 @@ export interface WickedAPI {
 
   // Web portal
   portalGetStatus(): Promise<PortalStatus>;
+
+  // Data root & backups
+  dataGetLocations(): Promise<DataLocations>;
+  dataConsolidate(root: string): Promise<string[]>;
 
   // Shell
   openExternal(path: string): Promise<void>;

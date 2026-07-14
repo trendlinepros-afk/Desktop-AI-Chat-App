@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { PortalStatus, Provider, Settings } from '../../types';
+import type { DataLocations, PortalStatus, Provider, Settings } from '../../types';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
 import { useOnboardingStore } from '../../store/onboardingStore';
@@ -232,6 +232,48 @@ export function SettingsModal() {
             </p>
           </Section>
 
+          {/* Voice (dictation, calls, read-aloud) */}
+          <Section title="Voice">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-sm text-text-muted">Voice</label>
+              <select
+                value={draft.ttsVoice}
+                onChange={(e) => update({ ttsVoice: e.target.value })}
+                className="rounded-lg border border-edge bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
+              >
+                {TTS_VOICES.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <label className="ml-2 text-sm text-text-muted">Speech</label>
+              <select
+                value={draft.ttsModel}
+                onChange={(e) => update({ ttsModel: e.target.value })}
+                className="rounded-lg border border-edge bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
+              >
+                <option value="gpt-4o-mini-tts">gpt-4o-mini-tts (best)</option>
+                <option value="tts-1">tts-1 (fastest)</option>
+                <option value="tts-1-hd">tts-1-hd</option>
+              </select>
+              <label className="ml-2 text-sm text-text-muted">Hearing</label>
+              <select
+                value={draft.sttModel}
+                onChange={(e) => update({ sttModel: e.target.value })}
+                className="rounded-lg border border-edge bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
+              >
+                <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe (best)</option>
+                <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
+                <option value="whisper-1">whisper-1</option>
+              </select>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              Powers the 🎤 dictation and 📱 voice-call buttons in the chat input and the 🔊 Speak
+              button under messages. Uses your OpenAI API key (a few cents per hour of talking).
+            </p>
+          </Section>
+
           {/* Web portal (LAN browser access) */}
           <Section title="Web portal (browser access)">
             <label className="flex items-center gap-2 text-sm">
@@ -260,6 +302,11 @@ export function SettingsModal() {
               keys — so only open it on devices you trust. If another device can't connect, allow
               WICKED through Windows Defender Firewall when prompted.
             </p>
+          </Section>
+
+          {/* Data root & backups */}
+          <Section title="Data & backup">
+            <DataRootView />
           </Section>
 
           {/* MCP servers */}
@@ -319,6 +366,108 @@ export function SettingsModal() {
   );
 }
 
+// Every place the app stores data, plus one-click consolidation of all
+// file-based stores into a single root (e.g. a network share for backup).
+function DataRootView() {
+  const toast = useUIStore((s) => s.toast);
+  const load = useSettingsStore((s) => s.load);
+  const [loc, setLoc] = useState<DataLocations | null>(null);
+  const [root, setRoot] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () =>
+    window.polyglot.dataGetLocations().then((l) => {
+      setLoc(l);
+      setRoot((r) => r || l.dataRootPath);
+    });
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const consolidate = async () => {
+    const target = root.trim();
+    if (!target) return;
+    if (
+      !window.confirm(
+        `Copy the Obsidian vault, RP memory, and Project Boards into:\n\n${target}\n\nOriginals are left in place, and database backups start going there. Continue?`
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const actions = await window.polyglot.dataConsolidate(target);
+      toast('Data consolidated — see Settings for new locations', 'success');
+      window.alert(`Done:\n\n• ${actions.join('\n• ')}`);
+      await load();
+      await refresh();
+    } catch (err) {
+      toast(`Consolidation failed: ${(err as Error).message}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const row = (label: string, value: string) => (
+    <div className="flex gap-2 text-xs">
+      <span className="w-32 flex-shrink-0 text-text-muted">{label}</span>
+      <span className="break-all font-mono">{value || '—'}</span>
+    </div>
+  );
+
+  return (
+    <div className="space-y-2">
+      {loc && (
+        <div className="space-y-1 rounded-lg border border-edge bg-surface px-3 py-2">
+          {row('Chat database', loc.dbPath + ' (local)')}
+          {row('Obsidian vault', loc.vaultPath)}
+          {row('RP memory', loc.rpVaultPath)}
+          {row('Project Boards', loc.projectBoardPath)}
+          {row(
+            'Last DB backup',
+            loc.lastBackupAt ? new Date(loc.lastBackupAt).toLocaleString() : 'never'
+          )}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          value={root}
+          onChange={(e) => setRoot(e.target.value)}
+          placeholder={'\\\\server\\share\\Wicked AI Desktop APP'}
+          className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 font-mono text-xs outline-none focus:border-accent"
+        />
+        <button
+          onClick={consolidate}
+          disabled={busy || !root.trim()}
+          className="rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent/90 disabled:opacity-50"
+        >
+          {busy ? 'Copying…' : 'Consolidate here'}
+        </button>
+      </div>
+      <p className="text-xs text-text-muted">
+        Moves all file-based data (vaults, boards) under one folder — point it at a network share
+        and everything is in one backed-up place. The live chat database stays on this PC (SQLite
+        corrupts on network drives) but a copy is written to the share's <code>Backups</code>{' '}
+        folder on every launch and every 6 hours. After consolidating, re-open the vault in
+        Obsidian from its new location.
+      </p>
+    </div>
+  );
+}
+
+const TTS_VOICES = [
+  'alloy',
+  'ash',
+  'ballad',
+  'coral',
+  'echo',
+  'fable',
+  'nova',
+  'onyx',
+  'sage',
+  'shimmer',
+  'verse',
+];
+
 // Live state of the LAN web portal: whether it's serving and the link(s) to
 // open on another device. Reflects saved settings, not the unsaved draft.
 function PortalStatusView() {
@@ -374,7 +523,8 @@ function PortalStatusView() {
       {status.running && (
         <p className="mt-1.5 text-xs text-text-muted">
           Open a link on any device on the same network. The token is remembered per browser
-          after the first visit.
+          after the first visit. Use the <strong>https://</strong> link on phones for voice
+          features — accept the certificate warning once.
         </p>
       )}
     </div>

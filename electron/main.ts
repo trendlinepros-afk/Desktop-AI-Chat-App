@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, session, shell } from 'electron';
 import electronUpdater from 'electron-updater';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -10,6 +10,7 @@ import * as vault from './vault';
 import * as rpMemory from './rpMemory';
 import * as brainFolder from './brainFolder';
 import * as projectBoard from './projectBoard';
+import * as dataRoot from './dataRoot';
 import * as webPortal from './webPortal';
 import * as mcp from './mcp';
 import type { McpServerConfig } from './mcp';
@@ -71,12 +72,18 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   db.initDb();
+  // Explicitly allow permission requests from our own renderer (microphone
+  // for voice chat/dictation) — documents Electron's default-allow behavior.
+  session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) =>
+    callback(true)
+  );
   // Must run before registerIpc so the portal sees every handler.
   webPortal.captureIpcHandlers();
   registerIpc();
   createWindow();
   webPortal.init(RENDERER_DIST);
   webPortal.sync();
+  dataRoot.startBackupSchedule();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -249,6 +256,10 @@ function registerIpc(): void {
 
   // ----- Web portal -----
   ipcMain.handle('portal:getStatus', () => webPortal.getStatus());
+
+  // ----- Data root & backups -----
+  ipcMain.handle('data:getLocations', () => dataRoot.getLocations());
+  ipcMain.handle('data:consolidate', (_e, root: string) => dataRoot.consolidate(root));
 
   // ----- File dialogs -----
   ipcMain.handle('dialog:openFile', async () => {

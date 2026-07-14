@@ -1,13 +1,22 @@
 import { useRef, useState } from 'react';
 import type { Chat, ContentPart } from '../../types';
 import { useSend } from '../../hooks/useSend';
+import { useSettingsStore } from '../../store/settingsStore';
+import { useUIStore } from '../../store/uiStore';
+import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { transcribe, unlockAudio } from '../../lib/voice';
 import { AttachmentPreview } from './AttachmentPreview';
+import { CallOverlay } from '../Call/CallOverlay';
 
 export function InputArea({ chat }: { chat: Chat }) {
   const { send, stop, isStreaming } = useSend();
+  const settings = useSettingsStore((s) => s.settings);
+  const toast = useUIStore((s) => s.toast);
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<ContentPart[]>([]);
+  const [callOpen, setCallOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recorder = useVoiceRecorder();
 
   const autoResize = () => {
     const el = textareaRef.current;
@@ -74,6 +83,48 @@ export function InputArea({ chat }: { chat: Chat }) {
     }
   };
 
+  // One-shot dictation: tap to record, tap again (or ~1.4s of silence) to
+  // stop; the transcription is appended to the input for review.
+  const finishDictation = async () => {
+    const result = await recorder.stop();
+    if (!result) {
+      recorder.setState('idle');
+      return;
+    }
+    try {
+      const spoken = await transcribe(result.blob, result.mime, settings);
+      if (spoken) {
+        setText((prev) => (prev ? `${prev} ${spoken}` : spoken));
+        setTimeout(() => {
+          autoResize();
+          textareaRef.current?.focus();
+        }, 0);
+      }
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    } finally {
+      recorder.setState('idle');
+    }
+  };
+
+  const onMic = async () => {
+    unlockAudio();
+    if (recorder.state === 'recording') {
+      void finishDictation();
+      return;
+    }
+    if (recorder.state !== 'idle') return;
+    if (!settings.openaiApiKey) {
+      toast('Voice input needs an OpenAI API key — add one in Settings.', 'error');
+      return;
+    }
+    try {
+      await recorder.start({ silenceMs: 1400, maxMs: 30_000, onAutoStop: () => void finishDictation() });
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    }
+  };
+
   return (
     <div className="border-t border-edge bg-chat px-4 py-3">
       <div className="mx-auto max-w-3xl">
@@ -88,6 +139,41 @@ export function InputArea({ chat }: { chat: Chat }) {
             className="px-2 py-2 text-text-muted hover:text-text-primary"
           >
             📎
+          </button>
+          <button
+            onClick={() => void onMic()}
+            title={
+              recorder.state === 'recording'
+                ? 'Stop and transcribe'
+                : 'Dictate — tap, speak, and it types for you'
+            }
+            className={`relative px-2 py-2 ${
+              recorder.state === 'recording'
+                ? 'animate-pulse text-red-500'
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            {recorder.state === 'transcribing' ? '⏳' : recorder.state === 'recording' ? '🔴' : '🎤'}
+            {recorder.state === 'recording' && (
+              <span
+                className="absolute bottom-0.5 left-1/2 h-0.5 -translate-x-1/2 rounded bg-red-500"
+                style={{ width: `${Math.max(15, recorder.level * 100)}%` }}
+              />
+            )}
+          </button>
+          <button
+            onClick={() => {
+              unlockAudio();
+              if (!settings.openaiApiKey) {
+                toast('Voice calls need an OpenAI API key — add one in Settings.', 'error');
+                return;
+              }
+              setCallOpen(true);
+            }}
+            title="Start a voice call with this chat"
+            className="px-2 py-2 text-text-muted hover:text-text-primary"
+          >
+            📱
           </button>
           <textarea
             ref={textareaRef}
@@ -120,6 +206,7 @@ export function InputArea({ chat }: { chat: Chat }) {
           )}
         </div>
       </div>
+      {callOpen && <CallOverlay chat={chat} onClose={() => setCallOpen(false)} />}
     </div>
   );
 }
