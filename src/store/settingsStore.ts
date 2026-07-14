@@ -33,6 +33,9 @@ const EMPTY: Settings = {
   ttsModel: 'gpt-4o-mini-tts',
   ttsVoice: 'alloy',
   dataRootPath: '',
+  comfyUrl: 'http://127.0.0.1:8188',
+  comfyCheckpoint: '',
+  comfyWorkflow: '',
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

@@ -1,6 +1,6 @@
 {
   "name": "wicked",
-  "version": "1.0.33",
+  "version": "1.0.34",
   "description": "WICKED — One window. Every model. One memory. Multi-model AI chat desktop app with an Obsidian-compatible Master Brain.",
   "author": "WICKED",
   "main": "dist-electron/main.js",

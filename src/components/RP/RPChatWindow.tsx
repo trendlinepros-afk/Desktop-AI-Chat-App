@@ -7,6 +7,7 @@ import { getTtsQueue, speakAppendText, transcribe, unlockAudio } from '../../lib
 import { SpeakButton } from '../Chat/SpeakButton';
 import { AddPersonModal } from './AddPersonModal';
 import { GuideModal } from './GuideModal';
+import { RPImageModal } from './RPImageModal';
 import { Avatar } from './Avatar';
 import type { RPMessage, RPPersona } from '../../types';
 
@@ -52,6 +53,7 @@ export function RPChatWindow({
   const [titleEditing, setTitleEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [autoSpeak, setAutoSpeak] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recorder = useVoiceRecorder();
@@ -318,6 +320,7 @@ export function RPChatWindow({
             <MessageRow
               key={m.id}
               text={m.content}
+              image={m.image}
               mine={mine}
               avatar={sender?.avatar ?? '🧑'}
               avatarImage={sender?.avatarImage || undefined}
@@ -423,6 +426,19 @@ export function RPChatWindow({
             className="max-h-40 min-h-[3rem] flex-1 resize-none rounded-xl border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
           />
           <button
+            onClick={() => {
+              if (aiMembers.length === 0) {
+                toast('Add a character to the conversation first', 'error');
+                return;
+              }
+              setImageOpen(true);
+            }}
+            title="Generate an image with your local ComfyUI — the persona sends it in chat"
+            className="rounded-xl border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+          >
+            🎨
+          </button>
+          <button
             onClick={() => void onMic()}
             title={
               recorder.state === 'recording' ? 'Stop and transcribe' : 'Dictate your message'
@@ -468,6 +484,13 @@ export function RPChatWindow({
         <AddPersonModal onClose={() => setAddOpen(false)} onCreateNew={onCreatePersona} />
       )}
       {guideOpen && <GuideModal onClose={() => setGuideOpen(false)} />}
+      {imageOpen && (
+        <RPImageModal
+          sceneId={scene.id}
+          personas={aiMembers}
+          onClose={() => setImageOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -508,6 +531,7 @@ function renderRP(text: string) {
 
 function MessageRow({
   text,
+  image,
   mine,
   avatar,
   avatarImage,
@@ -523,6 +547,7 @@ function MessageRow({
   onRate,
 }: {
   text: string;
+  image?: string;
   mine: boolean;
   avatar: string;
   avatarImage?: string;
@@ -584,6 +609,15 @@ function MessageRow({
               mine ? 'bg-user text-white' : 'bg-surface text-text-primary'
             }`}
           >
+            {image && (
+              <img
+                src={image}
+                alt=""
+                className="mb-1.5 max-h-96 w-full cursor-pointer rounded-lg object-contain"
+                onClick={() => window.open(image, '_blank')}
+                title="Open full size"
+              />
+            )}
             {renderRP(text)}
           </div>
         )}

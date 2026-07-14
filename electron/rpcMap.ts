@@ -147,6 +147,13 @@ export const RPC_CHANNELS: Record<keyof WickedAPI, string> = {
   dataGetLocations: 'data:getLocations',
   dataConsolidate: 'data:consolidate',
 
+  // Local image generation (ComfyUI)
+  comfyGetStatus: 'comfy:getStatus',
+  comfyListModels: 'comfy:listModels',
+  comfyFreeVram: 'comfy:freeVram',
+  comfyLoadModel: 'comfy:loadModel',
+  comfyGenerate: 'comfy:generate',
+
   // Shell
   openExternal: 'shell:openExternal',
 };

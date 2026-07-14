@@ -117,6 +117,11 @@ export interface RPPersona {
   greeting: string; // optional opening line the persona sends first
   model: string; // Grok model used for this persona
   isMe: boolean; // marks the persona that represents YOU (your background)
+  // Local image generation (ComfyUI): standing appearance prompt + which
+  // installed LoRA (if any) renders this persona consistently.
+  imagePrompt: string;
+  loraName: string;
+  loraStrength: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -145,6 +150,7 @@ export interface RPMessage {
   content: string;
   kind: 'chat' | 'director'; // 'director' = an out-of-character steer you wrote
   rating: 'up' | 'down' | ''; // your thumbs feedback on this message
+  image?: string; // data URL — a generated image the persona "sent"
   createdAt: number;
 }
 
@@ -252,6 +258,24 @@ export interface Settings {
   // One root folder (e.g. a network share) holding all file-based app data
   // plus rolling database backups. '' = not configured.
   dataRootPath: string;
+  // Local image generation via a user-run ComfyUI instance.
+  comfyUrl: string;
+  comfyCheckpoint: string;
+  comfyWorkflow: string; // optional custom API-format workflow with {{PROMPT}}/{{SEED}}
+}
+
+// Local image generation (ComfyUI) status + installed models.
+export interface ComfyStatus {
+  reachable: boolean;
+  deviceName: string;
+  vramTotal: number;
+  vramFree: number;
+  error?: string;
+}
+
+export interface ComfyModels {
+  checkpoints: string[];
+  loras: string[];
 }
 
 // Where everything lives on disk (Settings → Data & backup).
@@ -417,7 +441,17 @@ export interface WickedAPI {
     patch: Partial<
       Pick<
         RPPersona,
-        'name' | 'description' | 'avatar' | 'avatarImage' | 'greeting' | 'model' | 'isMe'
+        | 'name'
+        | 'description'
+        | 'avatar'
+        | 'avatarImage'
+        | 'greeting'
+        | 'model'
+        | 'isMe'
+        | 'avatarRotateDaily'
+        | 'imagePrompt'
+        | 'loraName'
+        | 'loraStrength'
       >
     >
   ): Promise<void>;
@@ -445,6 +479,7 @@ export interface WickedAPI {
     senderPersonaId: string | null;
     content: string;
     kind?: 'chat' | 'director';
+    image?: string;
   }): Promise<RPMessage>;
   rpUpdateSceneMessage(id: string, content: string): Promise<void>;
   rpDeleteSceneMessage(id: string): Promise<void>;
@@ -487,6 +522,21 @@ export interface WickedAPI {
   // Data root & backups
   dataGetLocations(): Promise<DataLocations>;
   dataConsolidate(root: string): Promise<string[]>;
+
+  // Local image generation (ComfyUI)
+  comfyGetStatus(): Promise<ComfyStatus>;
+  comfyListModels(): Promise<ComfyModels>;
+  comfyFreeVram(): Promise<void>;
+  comfyLoadModel(): Promise<void>;
+  comfyGenerate(opts: {
+    prompt: string;
+    loraName?: string;
+    loraStrength?: number;
+    width?: number;
+    height?: number;
+    steps?: number;
+    seed?: number;
+  }): Promise<{ image: string; seed: number }>;
 
   // Shell
   openExternal(path: string): Promise<void>;

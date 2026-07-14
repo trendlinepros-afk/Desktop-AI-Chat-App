@@ -73,6 +73,9 @@ const DEFAULT_SETTINGS: Settings = {
   ttsModel: 'gpt-4o-mini-tts',
   ttsVoice: 'alloy',
   dataRootPath: '',
+  comfyUrl: 'http://127.0.0.1:8188',
+  comfyCheckpoint: '',
+  comfyWorkflow: '',
 };
 
 export function initDb(): void {
@@ -204,6 +207,20 @@ export function initDb(): void {
   }
   if (!columnExists('rp_personas', 'avatar_rotated_at')) {
     db.exec('ALTER TABLE rp_personas ADD COLUMN avatar_rotated_at INTEGER NOT NULL DEFAULT 0');
+  }
+  // Local image generation (ComfyUI): per-persona appearance preset + LoRA.
+  if (!columnExists('rp_personas', 'image_prompt')) {
+    db.exec("ALTER TABLE rp_personas ADD COLUMN image_prompt TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists('rp_personas', 'lora_name')) {
+    db.exec("ALTER TABLE rp_personas ADD COLUMN lora_name TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists('rp_personas', 'lora_strength')) {
+    db.exec('ALTER TABLE rp_personas ADD COLUMN lora_strength REAL NOT NULL DEFAULT 0.85');
+  }
+  // Personas can "send" generated images into the conversation.
+  if (!columnExists('rp_scene_messages', 'image_data')) {
+    db.exec("ALTER TABLE rp_scene_messages ADD COLUMN image_data TEXT NOT NULL DEFAULT ''");
   }
   if (!columnExists('rp_scene_messages', 'kind')) {
     db.exec("ALTER TABLE rp_scene_messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'chat'");
@@ -752,6 +769,9 @@ export function getSettings(): Settings {
     ttsModel: map.get('ttsModel') ?? DEFAULT_SETTINGS.ttsModel,
     ttsVoice: map.get('ttsVoice') ?? DEFAULT_SETTINGS.ttsVoice,
     dataRootPath: map.get('dataRootPath') ?? DEFAULT_SETTINGS.dataRootPath,
+    comfyUrl: map.get('comfyUrl') ?? DEFAULT_SETTINGS.comfyUrl,
+    comfyCheckpoint: map.get('comfyCheckpoint') ?? DEFAULT_SETTINGS.comfyCheckpoint,
+    comfyWorkflow: map.get('comfyWorkflow') ?? DEFAULT_SETTINGS.comfyWorkflow,
   };
 }
 
@@ -911,6 +931,9 @@ interface RPPersonaRow {
   avatar_image: string | null;
   avatar_rotate_daily: number | null;
   avatar_rotated_at: number | null;
+  image_prompt: string | null;
+  lora_name: string | null;
+  lora_strength: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -926,6 +949,9 @@ function mapPersona(r: RPPersonaRow): RPPersona {
     greeting: r.greeting,
     model: r.model,
     isMe: !!r.is_me,
+    imagePrompt: r.image_prompt ?? '',
+    loraName: r.lora_name ?? '',
+    loraStrength: r.lora_strength ?? 0.85,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -964,6 +990,9 @@ export function rpCreatePersona(data: {
     avatar_image: data.avatarImage ?? '',
     avatar_rotate_daily: 0,
     avatar_rotated_at: 0,
+    image_prompt: '',
+    lora_name: '',
+    lora_strength: 0.85,
     created_at: now,
     updated_at: now,
   };
@@ -999,6 +1028,9 @@ export function rpUpdatePersona(
       | 'model'
       | 'isMe'
       | 'avatarRotateDaily'
+      | 'imagePrompt'
+      | 'loraName'
+      | 'loraStrength'
     >
   >
 ): void {
@@ -1011,6 +1043,8 @@ export function rpUpdatePersona(
     avatarImage: 'avatar_image',
     greeting: 'greeting',
     model: 'model',
+    imagePrompt: 'image_prompt',
+    loraName: 'lora_name',
   };
   for (const [key, col] of Object.entries(strMap)) {
     const v = (patch as Record<string, unknown>)[key];
@@ -1026,6 +1060,10 @@ export function rpUpdatePersona(
   if (typeof patch.avatarRotateDaily === 'boolean') {
     cols.push('avatar_rotate_daily = ?');
     vals.push(patch.avatarRotateDaily ? 1 : 0);
+  }
+  if (typeof patch.loraStrength === 'number') {
+    cols.push('lora_strength = ?');
+    vals.push(patch.loraStrength);
   }
   if (cols.length === 0) return;
   cols.push('updated_at = ?');
@@ -1221,6 +1259,7 @@ interface RPMessageRow {
   content: string;
   kind: string | null;
   rating: string | null;
+  image_data: string | null;
   created_at: number;
 }
 
@@ -1232,6 +1271,7 @@ function mapRPMessage(r: RPMessageRow): RPMessage {
     content: r.content,
     kind: (r.kind as RPMessage['kind']) ?? 'chat',
     rating: (r.rating as RPMessage['rating']) ?? '',
+    image: r.image_data || undefined,
     createdAt: r.created_at,
   };
 }
@@ -1248,6 +1288,7 @@ export function rpSaveSceneMessage(msg: {
   senderPersonaId: string | null;
   content: string;
   kind?: string;
+  image?: string;
 }): RPMessage {
   const maxRow = db
     .prepare('SELECT MAX(created_at) AS m FROM rp_scene_messages WHERE scene_id = ?')
@@ -1260,11 +1301,20 @@ export function rpSaveSceneMessage(msg: {
     content: msg.content,
     kind: msg.kind ?? 'chat',
     rating: '',
+    image_data: msg.image ?? '',
     created_at: createdAt,
   };
   db.prepare(
-    'INSERT INTO rp_scene_messages (id, scene_id, sender_persona_id, content, kind, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(row.id, row.scene_id, row.sender_persona_id, row.content, row.kind, row.created_at);
+    'INSERT INTO rp_scene_messages (id, scene_id, sender_persona_id, content, kind, image_data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(
+    row.id,
+    row.scene_id,
+    row.sender_persona_id,
+    row.content,
+    row.kind,
+    row.image_data,
+    row.created_at
+  );
   touchScene(msg.sceneId);
   return mapRPMessage(row);
 }

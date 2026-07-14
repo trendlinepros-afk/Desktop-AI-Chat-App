@@ -17,6 +17,17 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
   const [rpVaultPath, setRpVaultPath] = useState(settings.rpVaultPath);
   const [rpAutoReplyLimit, setRpAutoReplyLimit] = useState(settings.rpAutoReplyLimit);
   const [showKey, setShowKey] = useState(false);
+  const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl);
+  const [comfyCheckpoint, setComfyCheckpoint] = useState(settings.comfyCheckpoint);
+  const [comfyWorkflow, setComfyWorkflow] = useState(settings.comfyWorkflow);
+  const [checkpoints, setCheckpoints] = useState<string[]>([]);
+
+  useEffect(() => {
+    window.polyglot
+      .comfyListModels()
+      .then((m) => setCheckpoints(m.checkpoints))
+      .catch(() => setCheckpoints([]));
+  }, []);
   const [models, setModels] = useState<string[]>(GROK_MODELS);
 
   useEffect(() => {
@@ -46,6 +57,9 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
       rpSummarizeEvery,
       rpVaultPath,
       rpAutoReplyLimit,
+      comfyUrl,
+      comfyCheckpoint,
+      comfyWorkflow,
     });
     toast('RP settings saved', 'success');
     onClose();
@@ -219,6 +233,51 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
             >
               📂 Open RP memory folder
             </button>
+          </div>
+
+          {/* Local image generation (ComfyUI) */}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">🎨 Local images (ComfyUI)</h3>
+            <div className="flex items-center gap-2">
+              <input
+                value={comfyUrl}
+                onChange={(e) => setComfyUrl(e.target.value)}
+                placeholder="http://127.0.0.1:8188"
+                className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+              <select
+                value={comfyCheckpoint}
+                onChange={(e) => setComfyCheckpoint(e.target.value)}
+                className="max-w-[14rem] rounded-lg border border-edge bg-surface px-2 py-2 text-sm outline-none focus:border-accent"
+              >
+                <option value="">Checkpoint…</option>
+                {checkpoints.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+                {comfyCheckpoint && !checkpoints.includes(comfyCheckpoint) && (
+                  <option value={comfyCheckpoint}>{comfyCheckpoint} (offline)</option>
+                )}
+              </select>
+            </div>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-text-muted hover:text-text-primary">
+                Advanced: custom workflow (API format, {'{{PROMPT}}'} / {'{{SEED}}'} placeholders)
+              </summary>
+              <textarea
+                value={comfyWorkflow}
+                onChange={(e) => setComfyWorkflow(e.target.value)}
+                rows={5}
+                placeholder="Paste a workflow exported from ComfyUI (Export → API). Leave empty to use the built-in Flux workflow."
+                className="mt-1 w-full resize-y rounded-lg border border-edge bg-surface px-3 py-2 font-mono text-xs outline-none focus:border-accent"
+              />
+            </details>
+            <p className="mt-1 text-xs text-text-muted">
+              Needs ComfyUI running on this PC (see the setup guide). Generation is available in a
+              conversation via the 🎨 button; each persona's LoRA + appearance preset live in its
+              editor.
+            </p>
           </div>
         </div>
 

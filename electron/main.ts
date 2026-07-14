@@ -11,6 +11,7 @@ import * as rpMemory from './rpMemory';
 import * as brainFolder from './brainFolder';
 import * as projectBoard from './projectBoard';
 import * as dataRoot from './dataRoot';
+import * as comfy from './comfy';
 import * as webPortal from './webPortal';
 import * as mcp from './mcp';
 import type { McpServerConfig } from './mcp';
@@ -260,6 +261,13 @@ function registerIpc(): void {
   // ----- Data root & backups -----
   ipcMain.handle('data:getLocations', () => dataRoot.getLocations());
   ipcMain.handle('data:consolidate', (_e, root: string) => dataRoot.consolidate(root));
+
+  // ----- Local image generation (ComfyUI) -----
+  ipcMain.handle('comfy:getStatus', () => comfy.getStatus());
+  ipcMain.handle('comfy:listModels', () => comfy.listModels());
+  ipcMain.handle('comfy:freeVram', () => comfy.freeVram());
+  ipcMain.handle('comfy:loadModel', () => comfy.loadModel());
+  ipcMain.handle('comfy:generate', (_e, opts: comfy.GenerateOpts) => comfy.generate(opts));
 
   // ----- File dialogs -----
   ipcMain.handle('dialog:openFile', async () => {
