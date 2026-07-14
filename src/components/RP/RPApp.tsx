@@ -6,6 +6,7 @@ import { PersonaEditor } from './PersonaEditor';
 import { SceneEditor } from './SceneEditor';
 import { RPChatWindow } from './RPChatWindow';
 import { RPSettingsModal } from './RPSettingsModal';
+import { ComfyBar } from './ComfyBar';
 
 // The Role-Play side of the app — a full-screen overlay with its own personas,
 // group conversations, settings and memory, entirely separate from the main app.
@@ -46,7 +47,11 @@ export function RPApp() {
   const anyModalOpen = personaEditor.open || sceneEditor.open || settingsOpen;
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !anyModalOpen) setRpOpen(false);
+      // Modals inside RPChatWindow mark themselves with data-rp-modal and own
+      // Escape while open.
+      if (e.key === 'Escape' && !anyModalOpen && !document.querySelector('[data-rp-modal]')) {
+        setRpOpen(false);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -74,6 +79,7 @@ export function RPApp() {
           <h1 className="text-sm font-semibold">RP — Role-Play Studio</h1>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <ComfyBar />
           <button
             onClick={() => setSettingsOpen(true)}
             className="rounded-lg border border-edge px-3 py-1.5 text-sm text-text-muted hover:text-text-primary"

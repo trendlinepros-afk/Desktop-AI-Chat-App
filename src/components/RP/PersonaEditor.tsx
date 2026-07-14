@@ -35,6 +35,18 @@ export function PersonaEditor({
   const [model, setModel] = useState(existing?.model ?? defaultModel);
   const [isMe, setIsMe] = useState(existing?.isMe ?? false);
   const [rotateDaily, setRotateDaily] = useState(existing?.avatarRotateDaily ?? false);
+  const [imagePrompt, setImagePrompt] = useState(existing?.imagePrompt ?? '');
+  const [loraName, setLoraName] = useState(existing?.loraName ?? '');
+  const [loraStrength, setLoraStrength] = useState(existing?.loraStrength ?? 0.85);
+  const [loras, setLoras] = useState<string[]>([]);
+
+  // LoRAs installed in the user's local ComfyUI (empty when it's not running).
+  useEffect(() => {
+    window.polyglot
+      .comfyListModels()
+      .then((m) => setLoras(m.loras))
+      .catch(() => setLoras([]));
+  }, []);
 
   const [gallery, setGallery] = useState<RPPersonaImage[]>([]);
   const [genPrompt, setGenPrompt] = useState('');
@@ -125,10 +137,16 @@ export function PersonaEditor({
         model,
         isMe,
         avatarRotateDaily: rotateDaily,
+        imagePrompt,
+        loraName,
+        loraStrength,
       });
       toast('Persona updated', 'success');
     } else {
-      await createPersona({ name, avatar, avatarImage, description, greeting, model, isMe });
+      const persona = await createPersona({ name, avatar, avatarImage, description, greeting, model, isMe });
+      if (imagePrompt || loraName) {
+        await updatePersona(persona.id, { imagePrompt, loraName, loraStrength });
+      }
       toast('Persona created', 'success');
     }
     onClose();
@@ -328,6 +346,53 @@ export function PersonaEditor({
               </datalist>
             </div>
           )}
+
+          {/* Local image generation (ComfyUI) */}
+          <div className="rounded-xl border border-edge bg-surface/50 p-3">
+            <div className="mb-2 text-sm font-medium">🎨 Local image generator</div>
+            <label className="mb-1 block text-xs text-text-muted">
+              Appearance preset — prepended to every image prompt for this persona
+            </label>
+            <textarea
+              value={imagePrompt}
+              onChange={(e) => setImagePrompt(e.target.value)}
+              rows={2}
+              placeholder="e.g. photo of oflx_you woman, red hair, elegant style"
+              className="w-full resize-none rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <label className="text-xs text-text-muted">LoRA</label>
+              <select
+                value={loraName}
+                onChange={(e) => setLoraName(e.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-edge bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+              >
+                <option value="">None</option>
+                {loras.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+                {loraName && !loras.includes(loraName) && (
+                  <option value={loraName}>{loraName} (ComfyUI offline)</option>
+                )}
+              </select>
+              <label className="text-xs text-text-muted">Strength</label>
+              <input
+                type="number"
+                min={0}
+                max={2}
+                step={0.05}
+                value={loraStrength}
+                onChange={(e) => setLoraStrength(Number(e.target.value) || 0)}
+                className="w-20 rounded-lg border border-edge bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+              />
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              LoRAs are the files in ComfyUI's <code>models\loras</code> folder — start ComfyUI to
+              see them here. See the setup guide for training one.
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-edge px-5 py-3">
