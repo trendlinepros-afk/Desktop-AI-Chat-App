@@ -36,6 +36,7 @@ const EMPTY: Settings = {
   comfyUrl: 'http://127.0.0.1:8188',
   comfyCheckpoint: '',
   comfyWorkflow: '',
+  comfyLaunchPath: '',
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

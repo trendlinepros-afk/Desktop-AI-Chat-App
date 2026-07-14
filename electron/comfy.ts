@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as db from './db';
+import * as launcher from './comfyLauncher';
 import type { ComfyModels, ComfyStatus } from '../src/types';
 
 // Client for a locally-running ComfyUI instance (the user installs and runs
@@ -23,6 +24,7 @@ interface SystemStats {
 }
 
 export async function getStatus(): Promise<ComfyStatus> {
+  const proc = launcher.getProcessState();
   try {
     const stats = await jget<SystemStats>('/system_stats', 4000);
     const dev = stats.devices?.[0] ?? {};
@@ -31,6 +33,8 @@ export async function getStatus(): Promise<ComfyStatus> {
       deviceName: dev.name ?? '',
       vramTotal: dev.vram_total ?? 0,
       vramFree: dev.vram_free ?? 0,
+      managed: proc.managed,
+      processRunning: proc.processRunning,
     };
   } catch (err) {
     return {
@@ -38,6 +42,9 @@ export async function getStatus(): Promise<ComfyStatus> {
       deviceName: '',
       vramTotal: 0,
       vramFree: 0,
+      managed: proc.managed,
+      processRunning: proc.processRunning,
+      lastLog: proc.lastLog || undefined,
       error: (err as Error).message,
     };
   }

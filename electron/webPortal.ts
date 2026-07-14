@@ -47,6 +47,7 @@ const DESKTOP_ONLY = new Set([
   'update:install',
   'shell:openExternal',
   'rp:openMemoryFolder',
+  'comfy:chooseFolder',
 ]);
 
 const PORTAL_CHANNELS = new Set(Object.values(RPC_CHANNELS));
