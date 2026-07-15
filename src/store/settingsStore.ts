@@ -35,6 +35,7 @@ const EMPTY: Settings = {
   dataRootPath: '',
   comfyUrl: 'http://127.0.0.1:8188',
   comfyCheckpoint: '',
+  comfyModelFamily: '',
   comfyWorkflow: '',
   comfyLaunchPath: '',
   fluxGymPath: '',

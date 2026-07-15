@@ -19,6 +19,7 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
   const [showKey, setShowKey] = useState(false);
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl);
   const [comfyCheckpoint, setComfyCheckpoint] = useState(settings.comfyCheckpoint);
+  const [comfyModelFamily, setComfyModelFamily] = useState(settings.comfyModelFamily);
   const [comfyWorkflow, setComfyWorkflow] = useState(settings.comfyWorkflow);
   const [comfyLaunchPath, setComfyLaunchPath] = useState(settings.comfyLaunchPath);
   const [fluxGymPath, setFluxGymPath] = useState(settings.fluxGymPath);
@@ -61,6 +62,7 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
       rpAutoReplyLimit,
       comfyUrl,
       comfyCheckpoint,
+      comfyModelFamily,
       comfyWorkflow,
       comfyLaunchPath,
       fluxGymPath,
@@ -265,6 +267,26 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
                 )}
               </select>
             </div>
+            <div className="mt-2 flex items-center gap-2">
+              <label className="text-xs text-text-muted">Model type</label>
+              <select
+                value={comfyModelFamily}
+                onChange={(e) =>
+                  setComfyModelFamily(e.target.value as '' | 'flux' | 'sdxl')
+                }
+                className="rounded-lg border border-edge bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+              >
+                <option value="">Auto-detect from filename</option>
+                <option value="flux">Flux (LoRAs from FluxGym need this)</option>
+                <option value="sdxl">SDXL / SD 1.5</option>
+              </select>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              Flux and SDXL need very different sampler settings — the wrong type is the #1 cause
+              of extra limbs and melted faces. Auto-detect looks for “flux” in the checkpoint's
+              filename; if yours is a Flux model named something else, set this to{' '}
+              <strong>Flux</strong> explicitly.
+            </p>
             <div className="mt-2 flex items-center gap-2">
               <input
                 value={comfyLaunchPath}
