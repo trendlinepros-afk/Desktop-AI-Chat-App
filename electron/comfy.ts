@@ -114,9 +114,12 @@ function familyOf(checkpoint: string): ModelFamily {
   return /flux/i.test(checkpoint) ? 'flux' : 'sdxl';
 }
 
-// Steps used when the caller doesn't ask for a specific count.
+// Steps used when the caller doesn't ask for a specific count. Flux Schnell
+// is a 4-step distilled model — running it at 20 wastes time and degrades
+// the output.
 export function defaultSteps(checkpoint: string): number {
-  return familyOf(checkpoint) === 'flux' ? 20 : 28;
+  if (familyOf(checkpoint) !== 'flux') return 28;
+  return /schnell/i.test(checkpoint) ? 4 : 20;
 }
 
 const SDXL_NEGATIVE =
