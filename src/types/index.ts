@@ -285,6 +285,10 @@ export interface Settings {
   // Local image generation via a user-run ComfyUI instance.
   comfyUrl: string;
   comfyCheckpoint: string;
+  // Which sampler family the checkpoint needs: '' = auto-detect from the
+  // filename, or an explicit 'flux' / 'sdxl' override. Wrong family = melted
+  // anatomy, so users can pin it when the filename isn't obvious.
+  comfyModelFamily: '' | 'flux' | 'sdxl';
   comfyWorkflow: string; // optional custom API-format workflow with {{PROMPT}}/{{SEED}}
   // ComfyUI folder (or launch script) that WICKED starts in the background at
   // app launch and stops on quit. '' = the user manages ComfyUI themselves.

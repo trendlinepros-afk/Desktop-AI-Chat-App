@@ -105,7 +105,12 @@ export interface GenerateOpts {
 // build the right graph automatically so the user never tunes samplers.
 type ModelFamily = 'flux' | 'sdxl';
 
+// The RP Settings override wins; otherwise guess from the filename. A wrong
+// guess (e.g. a Flux fp8 build not named "flux") drives Flux at CFG 6.5,
+// which is precisely what produces extra limbs — hence the explicit setting.
 function familyOf(checkpoint: string): ModelFamily {
+  const override = db.getSettings().comfyModelFamily;
+  if (override === 'flux' || override === 'sdxl') return override;
   return /flux/i.test(checkpoint) ? 'flux' : 'sdxl';
 }
 
