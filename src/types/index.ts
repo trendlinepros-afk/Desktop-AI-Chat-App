@@ -121,6 +121,7 @@ export interface RPPersona {
   // installed LoRA (if any) renders this persona consistently. Legacy — new
   // personas point at a Person (personId) instead, which bundles all of this.
   imagePrompt: string;
+  imageNegative: string; // negative prompt (SDXL) — what to keep OUT of this persona's photos
   loraName: string;
   loraStrength: number;
   personId: string; // selected Person (visual identity); '' = use the legacy fields above
@@ -514,6 +515,7 @@ export interface WickedAPI {
         | 'isMe'
         | 'avatarRotateDaily'
         | 'imagePrompt'
+        | 'imageNegative'
         | 'loraName'
         | 'loraStrength'
         | 'personId'
@@ -627,6 +629,7 @@ export interface WickedAPI {
   comfyLoadModel(): Promise<void>;
   comfyGenerate(opts: {
     prompt: string;
+    negativePrompt?: string;
     loraName?: string;
     loraStrength?: number;
     width?: number;

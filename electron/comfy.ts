@@ -91,6 +91,7 @@ export async function loadModel(): Promise<void> {
 
 export interface GenerateOpts {
   prompt: string;
+  negativePrompt?: string;
   loraName?: string;
   loraStrength?: number;
   width?: number;
@@ -137,12 +138,19 @@ function defaultWorkflow(o: Required<Omit<GenerateOpts, 'loraName' | 'loraStreng
   // SDXL-family LoRAs also patch the text encoder, so their prompts route
   // through the LoRA's CLIP output; Flux LoRAs are model-only.
   const clipSource: [string, number] = useLora && family === 'sdxl' ? ['lora', 1] : ['ckpt', 1];
+  // A caller-supplied negative wins; otherwise fall back to the built-in
+  // quality negative for SDXL (Flux ignores the negative — cfg is 1).
+  const negText = o.negativePrompt.trim()
+    ? o.negativePrompt
+    : family === 'flux'
+      ? ''
+      : SDXL_NEGATIVE;
   const graph: Record<string, unknown> = {
     ckpt: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: o.checkpoint } },
     pos: { class_type: 'CLIPTextEncode', inputs: { text: o.prompt, clip: clipSource } },
     neg: {
       class_type: 'CLIPTextEncode',
-      inputs: { text: family === 'flux' ? '' : SDXL_NEGATIVE, clip: clipSource },
+      inputs: { text: negText, clip: clipSource },
     },
     latent: {
       class_type: family === 'flux' ? 'EmptySD3LatentImage' : 'EmptyLatentImage',
@@ -218,6 +226,7 @@ export async function generate(opts: GenerateOpts): Promise<{ image: string; see
     }
     workflow = defaultWorkflow({
       prompt: opts.prompt,
+      negativePrompt: opts.negativePrompt ?? '',
       width: opts.width ?? 1024,
       height: opts.height ?? 1024,
       steps: opts.steps ?? defaultSteps(settings.comfyCheckpoint),
