@@ -1,6 +1,18 @@
 import type { RPPerson, RPPersona } from '../types';
 import { useRPStore } from '../store/rpStore';
 
+// Recommended default negative prompt for the RP image generator (SDXL). It
+// steers hard against clothing/censorship for explicit output, and its anatomy
+// terms double as the fix for extra/duplicated limbs. Only applies to SDXL —
+// Flux ignores the negative (its cfg is fixed at 1). New personas start with
+// this pre-filled; users can edit or clear it per persona.
+export const DEFAULT_RP_NEGATIVE =
+  'clothed, clothing, clothes, dressed, fully clothed, underwear, lingerie, bra, panties, ' +
+  'swimsuit, bikini, censored, mosaic censorship, bar censor, deformed, bad anatomy, bad hands, ' +
+  'extra fingers, missing fingers, fused fingers, extra limbs, extra arms, extra legs, ' +
+  'disfigured, mutated, malformed, blurry, lowres, worst quality, low quality, jpeg artifacts, ' +
+  'watermark, signature, text';
+
 // Shared by the 🎨 manual dialog and the 📷 auto scene shot: generate with the
 // persona's identity (its selected Person, or the legacy per-persona preset),
 // plus current look + scene prompt, then post the image into the conversation
@@ -43,6 +55,7 @@ export async function generateAndSend(opts: {
   const person = personFor(opts.persona);
   const result = await window.polyglot.comfyGenerate({
     prompt: fullPrompt,
+    negativePrompt: (opts.persona.imageNegative ?? '').trim() || undefined,
     loraName: (person ? person.loraName : opts.persona.loraName) || undefined,
     loraStrength: person ? person.loraStrength : opts.persona.loraStrength,
     width: opts.width ?? 1024,

@@ -8,6 +8,7 @@ import { resizeDataUrl } from '../../lib/rpImage';
 import { TTS_VOICES, speakText, unlockAudio } from '../../lib/voice';
 import { Avatar } from './Avatar';
 import { PersonModal } from './PersonModal';
+import { DEFAULT_RP_NEGATIVE } from '../../lib/rpImageSend';
 import type { RPPersonaImage } from '../../types';
 
 // Create or edit a persona. `personaId === null` means create.
@@ -41,6 +42,11 @@ export function PersonaEditor({
   const [isMe, setIsMe] = useState(existing?.isMe ?? false);
   const [rotateDaily, setRotateDaily] = useState(existing?.avatarRotateDaily ?? false);
   const [imagePrompt, setImagePrompt] = useState(existing?.imagePrompt ?? '');
+  // New personas start with the recommended explicit/anatomy negative; existing
+  // ones keep whatever they had saved (blank until first edited).
+  const [imageNegative, setImageNegative] = useState(
+    existing ? (existing.imageNegative ?? '') : DEFAULT_RP_NEGATIVE
+  );
   const [loraName, setLoraName] = useState(existing?.loraName ?? '');
   const [loraStrength, setLoraStrength] = useState(existing?.loraStrength ?? 0.85);
   const [personId, setPersonId] = useState(existing?.personId ?? '');
@@ -155,6 +161,7 @@ export function PersonaEditor({
         isMe,
         avatarRotateDaily: rotateDaily,
         imagePrompt,
+        imageNegative,
         loraName,
         loraStrength,
         personId,
@@ -163,8 +170,8 @@ export function PersonaEditor({
       toast('Persona updated', 'success');
     } else {
       const persona = await createPersona({ name, avatar, avatarImage, description, greeting, model, isMe });
-      if (imagePrompt || loraName || personId || voice) {
-        await updatePersona(persona.id, { imagePrompt, loraName, loraStrength, personId, voice });
+      if (imagePrompt || imageNegative || loraName || personId || voice) {
+        await updatePersona(persona.id, { imagePrompt, imageNegative, loraName, loraStrength, personId, voice });
       }
       toast('Persona created', 'success');
     }
@@ -481,6 +488,43 @@ export function PersonaEditor({
                 }
                 className="w-full resize-none rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
               />
+            </div>
+            <div className="mt-2">
+              <div className="mb-1 flex items-center justify-between">
+                <label className="block text-xs text-text-muted">
+                  Negative prompt — what to keep OUT (SDXL only)
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setImageNegative(DEFAULT_RP_NEGATIVE)}
+                    className="text-[11px] text-accent hover:underline"
+                  >
+                    Use recommended
+                  </button>
+                  {imageNegative && (
+                    <button
+                      type="button"
+                      onClick={() => setImageNegative('')}
+                      className="text-[11px] text-text-muted hover:text-text-primary"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+              <textarea
+                value={imageNegative}
+                onChange={(e) => setImageNegative(e.target.value)}
+                rows={3}
+                placeholder="Words describing what should NOT appear (clothing, censorship, bad anatomy…)"
+                className="w-full resize-y rounded-lg border border-edge bg-surface px-3 py-2 text-xs outline-none focus:border-accent"
+              />
+              <p className="mt-1 text-[11px] text-text-muted">
+                Pre-filled with a recommended default that pushes for explicit, anatomically clean
+                images — edit freely. Ignored on Flux checkpoints (they don't use a negative
+                prompt); works on SDXL like RealVisXL.
+              </p>
             </div>
             {!personId && (
               <details className="mt-2">

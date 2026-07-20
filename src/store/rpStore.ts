@@ -64,7 +64,7 @@ interface RPState {
     patch: Partial<
       Pick<
         RPPersona,
-        | 'name' | 'description' | 'avatar' | 'avatarImage' | 'greeting' | 'model' | 'isMe' | 'avatarRotateDaily' | 'imagePrompt' | 'loraName' | 'loraStrength' | 'personId' | 'voice' | 'lookPrompt'
+        | 'name' | 'description' | 'avatar' | 'avatarImage' | 'greeting' | 'model' | 'isMe' | 'avatarRotateDaily' | 'imagePrompt' | 'imageNegative' | 'loraName' | 'loraStrength' | 'personId' | 'voice' | 'lookPrompt'
       >
     >
   ) => Promise<void>;

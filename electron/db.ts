@@ -251,6 +251,10 @@ export function initDb(): void {
   if (!columnExists('rp_personas', 'person_id')) {
     db.exec("ALTER TABLE rp_personas ADD COLUMN person_id TEXT NOT NULL DEFAULT ''");
   }
+  // Per-persona negative prompt (SDXL) — what to keep out of generated photos.
+  if (!columnExists('rp_personas', 'image_negative')) {
+    db.exec("ALTER TABLE rp_personas ADD COLUMN image_negative TEXT NOT NULL DEFAULT ''");
+  }
   // Personas can "send" generated images into the conversation.
   if (!columnExists('rp_scene_messages', 'image_data')) {
     db.exec("ALTER TABLE rp_scene_messages ADD COLUMN image_data TEXT NOT NULL DEFAULT ''");
@@ -968,6 +972,7 @@ interface RPPersonaRow {
   avatar_rotate_daily: number | null;
   avatar_rotated_at: number | null;
   image_prompt: string | null;
+  image_negative: string | null;
   lora_name: string | null;
   lora_strength: number | null;
   person_id: string | null;
@@ -989,6 +994,7 @@ function mapPersona(r: RPPersonaRow): RPPersona {
     model: r.model,
     isMe: !!r.is_me,
     imagePrompt: r.image_prompt ?? '',
+    imageNegative: r.image_negative ?? '',
     loraName: r.lora_name ?? '',
     loraStrength: r.lora_strength ?? 0.85,
     personId: r.person_id ?? '',
@@ -1033,6 +1039,7 @@ export function rpCreatePersona(data: {
     avatar_rotate_daily: 0,
     avatar_rotated_at: 0,
     image_prompt: '',
+    image_negative: '',
     lora_name: '',
     lora_strength: 0.85,
     person_id: '',
@@ -1074,6 +1081,7 @@ export function rpUpdatePersona(
       | 'isMe'
       | 'avatarRotateDaily'
       | 'imagePrompt'
+      | 'imageNegative'
       | 'loraName'
       | 'loraStrength'
       | 'personId'
@@ -1092,6 +1100,7 @@ export function rpUpdatePersona(
     greeting: 'greeting',
     model: 'model',
     imagePrompt: 'image_prompt',
+    imageNegative: 'image_negative',
     loraName: 'lora_name',
     personId: 'person_id',
     voice: 'voice',
