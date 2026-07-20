@@ -208,17 +208,38 @@ export function RPChatWindow({
     const persona = byId(lastSpoken?.senderPersonaId ?? null) ?? aiMembers[0];
     setSnapBusy(true);
     try {
+      const meName = me?.name ?? 'the viewer';
       const recent = messages
         .filter((m) => m.kind === 'chat')
         .slice(-10)
-        .map((m) => `${byId(m.senderPersonaId)?.name ?? 'User'}: ${m.content}`)
+        .map((m) => `${byId(m.senderPersonaId)?.name ?? meName}: ${m.content}`)
         .join('\n');
+      // The subject in frame is `persona`; `meName` is the human/POV character.
+      // Grok must infer the CAMERA (perspective, angle, shot type) from the
+      // narration — that's what was missing and why framing/POV came out wrong.
+      const system =
+        `You are an expert Stable Diffusion prompt writer for a photoreal image model. ` +
+        `Read the role-play excerpt and write ONE image prompt capturing THIS exact moment, ` +
+        `with ${persona.name} as the visible subject.\n\n` +
+        `CAMERA FIRST — this is the most important part. Infer the viewpoint from the narration ` +
+        `and LEAD the prompt with composition tags:\n` +
+        `- If the moment is happening from ${meName}'s own first-person viewpoint (${meName} is ` +
+        `physically acting on or touching ${persona.name}, or the text reads as "I/you" doing ` +
+        `something to them), begin with: POV, first person view, ${meName}'s point of view. Frame ` +
+        `it as seen through ${meName}'s eyes — include what part of ${meName}'s body is visible in ` +
+        `frame if relevant.\n` +
+        `- Otherwise pick the most fitting third-person angle (from behind, from side, low angle, ` +
+        `over-the-shoulder, close-up, full body shot) that matches the action.\n` +
+        `- Always state a shot type (close-up / medium shot / full body) and the camera angle.\n\n` +
+        `Then describe: ${persona.name}'s exact pose and body position, facial expression, what ` +
+        `they are (or aren't) wearing, the setting, and the lighting. Match the explicitness of ` +
+        `the scene faithfully — be direct and anatomical when the moment is sexual; do not sanitize ` +
+        `or soften it.\n\n` +
+        `Output ONLY the prompt: comma-separated tags and short phrases, present tense, no ` +
+        `character names, no dialogue, under 75 words.`;
       const scenePrompt = (
         await window.polyglot.rpGrokComplete(grokKey, settings.grokModel, [
-          {
-            role: 'system',
-            content: `You write image-generation prompts. Describe the current visual moment of this roleplay scene as a photo of ${persona.name}: setting, pose, clothing, lighting, mood. Comma-separated fragments, present tense, no character names, no dialogue, under 60 words. Output only the prompt.`,
-          },
+          { role: 'system', content: system },
           { role: 'user', content: recent || 'The scene is just beginning.' },
         ])
       ).trim();
