@@ -310,7 +310,27 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
               Leave empty to keep starting ComfyUI yourself. Applies on next launch (or use ▶
               Start on the chip).
             </p>
-            <details className="mt-2">
+            {comfyWorkflow.trim() && (
+              <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs">
+                <span className="text-amber-500">⚠️</span>
+                <div className="flex-1">
+                  <p className="font-medium text-amber-500">A custom workflow is overriding everything above.</p>
+                  <p className="mt-0.5 text-text-muted">
+                    While this box has content, WICKED sends your pasted workflow as-is (only the
+                    prompt is filled in). The checkpoint, model type, and each persona's{' '}
+                    <strong>person / LoRA</strong> are all ignored — so switching persons won't
+                    change the image. Clear it to use those settings again.
+                  </p>
+                  <button
+                    onClick={() => setComfyWorkflow('')}
+                    className="mt-1.5 rounded-lg border border-amber-500/50 px-2 py-1 text-amber-500 hover:bg-amber-500/20"
+                  >
+                    Clear custom workflow
+                  </button>
+                </div>
+              </div>
+            )}
+            <details className="mt-2" open={!!comfyWorkflow.trim()}>
               <summary className="cursor-pointer text-xs text-text-muted hover:text-text-primary">
                 Advanced: custom workflow (API format, {'{{PROMPT}}'} / {'{{SEED}}'} placeholders)
               </summary>
@@ -318,7 +338,7 @@ export function RPSettingsModal({ onClose }: { onClose: () => void }) {
                 value={comfyWorkflow}
                 onChange={(e) => setComfyWorkflow(e.target.value)}
                 rows={5}
-                placeholder="Paste a workflow exported from ComfyUI (Export → API). Leave empty to use the built-in Flux workflow."
+                placeholder="Paste a workflow exported from ComfyUI (Export → API). Leave empty to use the built-in workflow (recommended — this is what makes the checkpoint + person pickers work)."
                 className="mt-1 w-full resize-y rounded-lg border border-edge bg-surface px-3 py-2 font-mono text-xs outline-none focus:border-accent"
               />
             </details>
