@@ -101,9 +101,26 @@ export function RPChatWindow({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, generating]);
 
-  // Focus the message box when you open/switch a conversation so you can just type.
+  // On phones the software keyboard shrinks the visible area; keep the latest
+  // messages pinned to the bottom when it opens or closes.
   useEffect(() => {
-    if (activeSceneId) inputRef.current?.focus();
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const el = scrollRef.current;
+      if (el) el.scrollTo({ top: el.scrollHeight });
+    };
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, []);
+
+  // Focus the message box when you open/switch a conversation so you can just
+  // type. Skipped on touch devices — there it would pop the keyboard over the
+  // conversation you just opened.
+  useEffect(() => {
+    if (!activeSceneId) return;
+    if (window.matchMedia?.('(pointer: coarse)').matches) return;
+    inputRef.current?.focus();
   }, [activeSceneId]);
 
   if (!scene) {
@@ -260,8 +277,8 @@ export function RPChatWindow({
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-edge bg-chat px-4 py-2">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-1 border-b border-edge bg-chat px-3 py-2 md:flex-row md:items-center md:gap-2 md:px-4">
+        <div className="min-w-0 md:flex-1">
           {titleEditing ? (
             <input
               autoFocus
@@ -272,7 +289,7 @@ export function RPChatWindow({
                 if (e.key === 'Enter') saveTitle();
                 if (e.key === 'Escape') setTitleEditing(false);
               }}
-              className="w-full rounded-md border border-edge bg-surface px-2 py-0.5 text-sm outline-none focus:border-accent"
+              className="w-full rounded-md border border-edge bg-surface px-2 py-0.5 text-base outline-none focus:border-accent md:text-sm"
             />
           ) : (
             <button
@@ -291,6 +308,7 @@ export function RPChatWindow({
             {members.length > 0 ? members.map((p) => `${p.avatar} ${p.name}`).join(' · ') : 'No one yet'}
           </p>
         </div>
+        <div className="flex items-center gap-1 overflow-x-auto md:gap-2 [&>*]:shrink-0 [&>button]:whitespace-nowrap">
         {summarizing && <span className="text-xs text-brain">💭 saving memory…</span>}
         <button
           onClick={() => {
@@ -368,10 +386,11 @@ export function RPChatWindow({
         >
           🗑 Clear
         </button>
+        </div>
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 md:px-4">
         {messages.length === 0 && !generating && (
           <p className="py-10 text-center text-sm text-text-muted">
             Say something to begin the scene.
@@ -431,8 +450,8 @@ export function RPChatWindow({
       {/* Per-character controls. The checkbox enables AUTOMATIC talking; clicking
           a name always makes that character speak now, even with auto off. */}
       {aiMembers.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-edge bg-chat px-4 py-2">
-          <span className="self-center text-xs text-text-muted">
+        <div className="flex items-center gap-2 overflow-x-auto border-t border-edge bg-chat px-3 py-2 md:flex-wrap md:px-4 [&>*]:shrink-0">
+          <span className="self-center whitespace-nowrap text-xs text-text-muted">
             Click a name to speak · check = auto-reply:
           </span>
           {aiMembers.map((p) => {
@@ -472,7 +491,7 @@ export function RPChatWindow({
       {/* Input. Clicking anywhere in the bar focuses the textarea so it's an easy
           target (not just the thin one-row field). */}
       <div
-        className="border-t border-edge bg-chat px-4 py-3"
+        className="border-t border-edge bg-chat px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:px-4 md:py-3"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget) {
             e.preventDefault();
@@ -481,7 +500,7 @@ export function RPChatWindow({
         }}
       >
         <div
-          className="flex items-end gap-2"
+          className="flex flex-wrap items-end gap-2"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               e.preventDefault();
@@ -501,8 +520,11 @@ export function RPChatWindow({
             }}
             placeholder={me ? `Message as ${me.name}…` : 'Type your message…'}
             rows={2}
-            className="max-h-40 min-h-[3rem] flex-1 resize-none rounded-xl border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+            className="max-h-40 min-h-[3rem] w-full min-w-0 resize-none rounded-xl border border-edge bg-surface px-3 py-2 text-base outline-none focus:border-accent md:w-auto md:flex-1 md:text-sm"
           />
+          {/* On phones the buttons sit on their own row under the textarea (the
+              wrapper disappears with display:contents on wider screens). */}
+          <div className="flex w-full items-center gap-1.5 overflow-x-auto md:contents [&>button]:shrink-0">
           <button
             onClick={() => {
               if (aiMembers.length === 0) {
@@ -512,7 +534,7 @@ export function RPChatWindow({
               setImageOpen(true);
             }}
             title="Generate an image with your local ComfyUI — the persona sends it in chat"
-            className="rounded-xl border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+            className="rounded-xl border border-edge px-2.5 py-2 text-sm text-text-muted hover:text-text-primary md:px-3"
           >
             🎨
           </button>
@@ -520,7 +542,7 @@ export function RPChatWindow({
             onClick={() => void snapScenePhoto()}
             disabled={snapBusy}
             title="Snap a photo of the current scene — the prompt is written automatically from the last few messages"
-            className="rounded-xl border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary disabled:opacity-60"
+            className="rounded-xl border border-edge px-2.5 py-2 text-sm text-text-muted hover:text-text-primary disabled:opacity-60 md:px-3"
           >
             {snapBusy ? '⏳' : '📷'}
           </button>
@@ -538,7 +560,7 @@ export function RPChatWindow({
               setCallOpen(true);
             }}
             title="Start a voice call with this scene"
-            className="rounded-xl border border-edge px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+            className="rounded-xl border border-edge px-2.5 py-2 text-sm text-text-muted hover:text-text-primary md:px-3"
           >
             📞
           </button>
@@ -547,7 +569,7 @@ export function RPChatWindow({
             title={
               recorder.state === 'recording' ? 'Stop and transcribe' : 'Dictate your message'
             }
-            className={`rounded-xl border border-edge px-3 py-2 text-sm ${
+            className={`rounded-xl border border-edge px-2.5 py-2 text-sm md:px-3 ${
               recorder.state === 'recording'
                 ? 'animate-pulse text-red-500'
                 : 'text-text-muted hover:text-text-primary'
@@ -562,25 +584,26 @@ export function RPChatWindow({
             }}
             disabled={generating || suggesting}
             title="Let AI draft your reply from the conversation — you can edit it before sending"
-            className="rounded-xl border border-accent/40 px-3 py-2 text-sm text-accent hover:bg-accent/10 disabled:opacity-50"
+            className="whitespace-nowrap rounded-xl border border-accent/40 px-2.5 py-2 text-sm text-accent hover:bg-accent/10 disabled:opacity-50 md:px-3"
           >
             {suggesting ? '…' : '✨ Suggest'}
           </button>
           {generating ? (
             <button
               onClick={stop}
-              className="rounded-xl border border-edge px-4 py-2 text-sm text-text-muted hover:text-text-primary"
+              className="ml-auto rounded-xl border border-edge px-4 py-2 text-sm text-text-muted hover:text-text-primary md:ml-0"
             >
               Stop
             </button>
           ) : (
             <button
               onClick={submit}
-              className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+              className="ml-auto rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 md:ml-0"
             >
               Send
             </button>
           )}
+          </div>
         </div>
       </div>
 
