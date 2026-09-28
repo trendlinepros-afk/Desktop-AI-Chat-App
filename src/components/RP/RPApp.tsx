@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRPStore } from '../../store/rpStore';
 import { useUIStore } from '../../store/uiStore';
+import { useVisualViewport } from '../../hooks/useVisualViewport';
 import { RPSidebar } from './RPSidebar';
 import { PersonaEditor } from './PersonaEditor';
 import { SceneEditor } from './SceneEditor';
@@ -28,6 +29,10 @@ export function RPApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const activeSceneId = useRPStore((s) => s.activeSceneId);
+  // On phones the software keyboard covers the bottom of a full-screen
+  // overlay; pin the overlay to the *visible* area instead so the composer
+  // and the last messages stay above the keyboard.
+  const viewport = useVisualViewport();
 
   // On phones the sidebar is a drawer — close it once a conversation is picked.
   useEffect(() => {
@@ -61,9 +66,12 @@ export function RPApp() {
   }, [setRpOpen, anyModalOpen]);
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-app text-text-primary">
+    <div
+      className="fixed inset-x-0 top-0 z-40 flex h-full flex-col overflow-hidden bg-app text-text-primary"
+      style={viewport ? { top: viewport.offsetTop, height: viewport.height } : undefined}
+    >
       {/* Top bar */}
-      <div className="flex items-center gap-2 border-b border-edge bg-topbar px-4 py-2">
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-edge bg-topbar px-2 py-2 md:px-4 [&>*]:shrink-0">
         <button
           onClick={() => setNavOpen(true)}
           title="Menu"
@@ -73,22 +81,23 @@ export function RPApp() {
         </button>
         <button
           onClick={() => setRpOpen(false)}
-          className="rounded-lg border border-edge px-3 py-1.5 text-sm text-text-muted hover:text-text-primary"
+          className="whitespace-nowrap rounded-lg border border-edge px-3 py-1.5 text-sm text-text-muted hover:text-text-primary"
         >
-          ← Back to WICKED
+          ← Back<span className="hidden md:inline"> to WICKED</span>
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="text-lg">🎭</span>
-          <h1 className="text-sm font-semibold">RP — Role-Play Studio</h1>
+          <h1 className="hidden truncate text-sm font-semibold md:block">RP — Role-Play Studio</h1>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <TrainingWatcher />
           <ComfyBar />
           <button
             onClick={() => setSettingsOpen(true)}
-            className="rounded-lg border border-edge px-3 py-1.5 text-sm text-text-muted hover:text-text-primary"
+            title="RP Settings"
+            className="whitespace-nowrap rounded-lg border border-edge px-3 py-1.5 text-sm text-text-muted hover:text-text-primary"
           >
-            ⚙️ RP Settings
+            ⚙️<span className="hidden md:inline"> RP Settings</span>
           </button>
         </div>
       </div>
